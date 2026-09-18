@@ -1,14 +1,14 @@
 {
   "meta": {
-    "generated": "2026-09-18 01:09 UTC",
+    "generated": "2026-09-18 01:13 UTC",
     "fortran_source": "vendor/calmet-fortran/src/calmet.for (READCF CVDIC groups 1\u20136 + READFN IG0 + station freeform)",
     "python_package": "py_calmet/",
     "sample_inp_glob": "cases/**/calmet.inp",
     "sample_inp_count": 14,
     "counts": {
       "total": 207,
-      "implemented": 45,
-      "partial": 162,
+      "implemented": 72,
+      "partial": 135,
       "missing": 0
     },
     "notes": [
@@ -98,7 +98,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (PRECIP.DAT unused.)",
+      "notes": "Accepted; station rates default 0 without PRECIP.DAT reader.",
       "api_field": "files.prcdat"
     },
     {
@@ -190,7 +190,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (CLOUD.DAT reader unused.)",
+      "notes": "CLOUD.DAT reader unused (RH path does not need it).",
       "api_field": "files.clddat"
     },
     {
@@ -237,8 +237,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Parsed on config; SEA.DAT physics TBD.",
+      "status": "Implemented",
+      "notes": "Gates SEA/COARE path (NOWSTA>0 enables overwater fluxes).",
       "api_field": "files.nowsta"
     },
     {
@@ -301,7 +301,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (SEA.DAT unused.)",
+      "notes": "SEA.DAT reader still TBD; COARE-lite uses air/SST bulk.",
       "api_field": "files.seadat"
     },
     {
@@ -1517,8 +1517,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Assumes 0/1 station; multi-station unused.",
+      "status": "Implemented",
+      "notes": "Surface station count; multi-station OA when SS* >1.",
       "api_field": "met.nssta"
     },
     {
@@ -1533,8 +1533,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Precipitation stations unused.)",
+      "status": "Implemented",
+      "notes": "\u22121 prognostic 3D.DAT rain \u2192 RMM; 0 none; >0 station Barnes (SIGMAP/CUTP).",
       "api_field": "met.npsta"
     },
     {
@@ -1566,7 +1566,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Precip file format unused.)",
+      "notes": "Precip format assumed.",
       "api_field": "met.iformp"
     },
     {
@@ -1581,8 +1581,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Cloud from SURF sky tenths; schemes 1\u20134 missing.",
+      "status": "Implemented",
+      "notes": "Honors 3/4 RH schemes; 0/1 use SURF sky tenths.",
       "api_field": "clouds.icloud"
     },
     {
@@ -1597,7 +1597,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Cloud output flag unused.)",
+      "notes": "Cloud output file not written.",
       "api_field": "clouds.icldout"
     },
     {
@@ -1611,8 +1611,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (INP 2.2 cloud method unused.)",
+      "status": "Implemented",
+      "notes": "CLOUD3 (Teixeira RH) / CLOUD4-lite layered RH \u2192 ccfrac \u2192 QSW.",
       "api_field": "clouds.mcloud"
     },
     {
@@ -1628,7 +1628,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Cloud file format unused.)",
+      "notes": "Cloud file format unused.",
       "api_field": "met.iformc"
     },
     {
@@ -1675,8 +1675,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Flag gates stub kinematic+div path; full TOPOF2 W missing.",
+      "status": "Implemented",
+      "notes": "TOPOF2 topographic kinematic W + DIVLIM-minim when IKINE=1.",
       "api_field": "winds.ikine"
     },
     {
@@ -1691,8 +1691,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Flag gates simplified div-min; full O'Brien missing.",
+      "status": "Implemented",
+      "notes": "OBrien continuity adjust with DIVLIM/NITER when IOBR=1.",
       "api_field": "winds.iobr"
     },
     {
@@ -1707,8 +1707,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Power-law obs profile; SIMILT helper exists but not wired.",
+      "status": "Implemented",
+      "notes": "Obs profile modes: \u00b11 UA-aloft, \u00b12/-4 power-law (golden), \u00b13 FEXTR2, +4 SIMILT.",
       "api_field": "winds.iextrp"
     },
     {
@@ -1739,8 +1739,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Extrapolation factors unused.)",
+      "status": "Implemented",
+      "notes": "Layer factors when |IEXTRP|=3.",
       "api_field": "winds.fextr2"
     },
     {
@@ -1834,8 +1834,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted; optional OA cutoff in multi-station path.",
+      "status": "Implemented",
+      "notes": "OA surface cutoff radius (multi-station path).",
       "api_field": "winds.rmax1"
     },
     {
@@ -1850,8 +1850,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted; optional OA cutoff aloft.",
+      "status": "Implemented",
+      "notes": "OA aloft cutoff radius.",
       "api_field": "winds.rmax2"
     },
     {
@@ -1946,8 +1946,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted; wired into objective_analyze as IGF weight (0=off, golden-safe).",
+      "status": "Implemented",
+      "notes": "IGF weight in Barnes OA (0=off); multi-station + golden-safe.",
       "api_field": "winds.rprog"
     },
     {
@@ -1962,8 +1962,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Divergence criterion unused (hardcoded loop).)",
+      "status": "Implemented",
+      "notes": "Divergence limit for MINIM / OBrien iteration.",
       "api_field": "winds.divlim"
     },
     {
@@ -1978,8 +1978,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Used (capped) in divergence minimization.",
+      "status": "Implemented",
+      "notes": "Max iterations for divergence minimization.",
       "api_field": "winds.niter"
     },
     {
@@ -2010,8 +2010,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Max stations per layer unused.)",
+      "status": "Implemented",
+      "notes": "Max stations per layer in Barnes OA.",
       "api_field": "winds.nintr2"
     },
     {
@@ -2042,8 +2042,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Used in light kinematic/div-min; full IKINE semantics incomplete.",
+      "status": "Implemented",
+      "notes": "TOPOF2 exponential decay coefficient (IKINE path).",
       "api_field": "winds.alpha"
     },
     {
@@ -2234,8 +2234,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Surface T station index unused.)",
+      "status": "Implemented",
+      "notes": "1-based SS* index for OA / representative station.",
       "api_field": "winds.isurft"
     },
     {
@@ -2250,8 +2250,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Upper T index unused.)",
+      "status": "Implemented",
+      "notes": "1-based upper-air station index (single-file path selects sounding).",
       "api_field": "winds.iupt"
     },
     {
@@ -2506,8 +2506,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Not applied to layer blending.",
+      "status": "Implemented",
+      "notes": "Layer speed bias when IEXTRP < 0.",
       "api_field": "winds.bias"
     },
     {
@@ -2666,8 +2666,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater Zi min unused.)",
+      "status": "Implemented",
+      "notes": "Overwater Zi minimum.",
       "api_field": "pbl.ziminw"
     },
     {
@@ -2682,8 +2682,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater Zi max unused.)",
+      "status": "Implemented",
+      "notes": "Overwater Zi maximum.",
       "api_field": "pbl.zimaxw"
     },
     {
@@ -2778,8 +2778,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater mixing unused.)",
+      "status": "Implemented",
+      "notes": "Overwater Zi scale in mixht_overwater.",
       "api_field": "pbl.constw"
     },
     {
@@ -2971,7 +2971,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Precip QC unused.)",
+      "notes": "Precip QC unused.",
       "api_field": "pbl.nflagp"
     },
     {
@@ -2986,8 +2986,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Precip sigma unused.)",
+      "status": "Implemented",
+      "notes": "Precip OA influence radius (km).",
       "api_field": "pbl.sigmap"
     },
     {
@@ -3002,8 +3002,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Precip cutoff unused.)",
+      "status": "Implemented",
+      "notes": "Precip rate cutoff (mm/h).",
       "api_field": "pbl.cutp"
     },
     {
@@ -3156,7 +3156,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater threshold unused.)",
+      "notes": "Overwater convective threshold unused in lite Zi.",
       "api_field": "pbl.threshw"
     },
     {
@@ -3171,8 +3171,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (No COARE overwater flux module (PSIUD helper only).)",
+      "status": "Implemented",
+      "notes": "COARE-lite bulk fluxes over water when ICOARE\u22600 and NOWSTA>0.",
       "api_field": "overwater.icoare"
     },
     {
@@ -3187,8 +3187,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (COARE coastal shelf unused.)",
+      "status": "Implemented",
+      "notes": "Coastal Cd enhancement in COARE-lite.",
       "api_field": "overwater.dshelf"
     },
     {
@@ -3204,7 +3204,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (COARE warm-layer unused.)",
+      "notes": "COARE warm-layer not in lite scheme.",
       "api_field": "overwater.iwarm"
     },
     {
@@ -3220,7 +3220,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (COARE cool-skin unused.)",
+      "notes": "COARE cool-skin not in lite scheme.",
       "api_field": "overwater.icool"
     },
     {
@@ -3281,8 +3281,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Single-station X/Y for OA; multi-station SSn unused.",
+      "status": "Implemented",
+      "notes": "Multi-station SS* X/Y parsed for Barnes OA.",
       "api_field": "stations.surface[0]"
     },
     {
@@ -3313,7 +3313,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Precip station records unused.)",
+      "notes": "Coords parsed; rates need PRECIP.DAT.",
       "api_field": "stations.precip[0]"
     }
   ]

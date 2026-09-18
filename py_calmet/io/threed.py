@@ -22,6 +22,7 @@ class ThreeDData:
     wd10: np.ndarray  # [nt, nj, ni]
     ws10: np.ndarray
     t2: np.ndarray
+    rain: np.ndarray  # [nt, nj, ni] mm per step (prognostic precip)
     # upper
     pres: np.ndarray  # [nt, nj, ni, nk]
     height_msl: np.ndarray
@@ -69,6 +70,7 @@ def read_3d(path: str | Path) -> ThreeDData:
             elev[jj, ii] = float(parts[4])
 
     wd10 = np.zeros((nhrs, nj, ni)); ws10 = np.zeros_like(wd10); t2 = np.zeros_like(wd10)
+    rain = np.zeros_like(wd10)
     pres = np.zeros((nhrs, nj, ni, nk)); height_msl = np.zeros_like(pres)
     tempk = np.zeros_like(pres); wd = np.zeros_like(pres); ws = np.zeros_like(pres)
     w = np.zeros_like(pres); rh = np.zeros_like(pres)
@@ -90,6 +92,11 @@ def read_3d(path: str | Path) -> ThreeDData:
                 rest = sline[16:]
                 vals = rest.replace("  ", " ").split()
                 # vals: spres rain sc radsw radlw t2 q2 wd10 ws10 sst
+                if len(vals) > 1:
+                    try:
+                        rain[t, jj, ii] = float(vals[1])
+                    except Exception:
+                        rain[t, jj, ii] = 0.0
                 t2[t, jj, ii] = float(vals[5])
                 wd10[t, jj, ii] = float(vals[7])
                 ws10[t, jj, ii] = float(vals[8])
@@ -114,6 +121,6 @@ def read_3d(path: str | Path) -> ThreeDData:
 
     return ThreeDData(
         ni=ni, nj=nj, nk=nk, x0_km=x0, y0_km=y0, dx_km=dx, sigma=sigma, elev=elev,
-        hours=hours, wd10=wd10, ws10=ws10, t2=t2,
+        hours=hours, wd10=wd10, ws10=ws10, t2=t2, rain=rain,
         pres=pres, height_msl=height_msl, tempk=tempk, wd=wd, ws=ws, w=w, rh=rh,
     )

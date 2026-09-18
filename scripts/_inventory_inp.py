@@ -925,6 +925,60 @@ for _k, _v in WP1_PARTIAL.items():
         PARTIAL[_k] = _v
         MISSING.pop(_k, None)
 
+
+# --- WP2 overlays (DIAGNO OA, IKINE/IOBR, clouds, precip, COARE-lite) ---
+WP2_IMPLEMENTED = {
+    "RPROG": "IGF weight in Barnes OA (0=off); multi-station + golden-safe.",
+    "RMAX1": "OA surface cutoff radius (multi-station path).",
+    "RMAX2": "OA aloft cutoff radius.",
+    "NINTR2": "Max stations per layer in Barnes OA.",
+    "IKINE": "TOPOF2 topographic kinematic W + DIVLIM-minim when IKINE=1.",
+    "IOBR": "OBrien continuity adjust with DIVLIM/NITER when IOBR=1.",
+    "ALPHA": "TOPOF2 exponential decay coefficient (IKINE path).",
+    "DIVLIM": "Divergence limit for MINIM / OBrien iteration.",
+    "NITER": "Max iterations for divergence minimization.",
+    "IEXTRP": "Obs profile modes: ±1 UA-aloft, ±2/-4 power-law (golden), ±3 FEXTR2, +4 SIMILT.",
+    "FEXTR2": "Layer factors when |IEXTRP|=3.",
+    "BIAS": "Layer speed bias when IEXTRP < 0.",
+    "ISURFT": "1-based SS* index for OA / representative station.",
+    "IUPT": "1-based upper-air station index (single-file path selects sounding).",
+    "SS1": "Multi-station SS* X/Y parsed for Barnes OA.",
+    "NSSTA": "Surface station count; multi-station OA when SS* >1.",
+    "MCLOUD": "CLOUD3 (Teixeira RH) / CLOUD4-lite layered RH → ccfrac → QSW.",
+    "ICLOUD": "Honors 3/4 RH schemes; 0/1 use SURF sky tenths.",
+    "NPSTA": "−1 prognostic 3D.DAT rain → RMM; 0 none; >0 station Barnes (SIGMAP/CUTP).",
+    "SIGMAP": "Precip OA influence radius (km).",
+    "CUTP": "Precip rate cutoff (mm/h).",
+    "ICOARE": "COARE-lite bulk fluxes over water when ICOARE≠0 and NOWSTA>0.",
+    "CONSTW": "Overwater Zi scale in mixht_overwater.",
+    "ZIMINW": "Overwater Zi minimum.",
+    "ZIMAXW": "Overwater Zi maximum.",
+    "DSHELF": "Coastal Cd enhancement in COARE-lite.",
+    "NOWSTA": "Gates SEA/COARE path (NOWSTA>0 enables overwater fluxes).",
+}
+WP2_PARTIAL = {
+    "PRCDAT": "Accepted; station rates default 0 without PRECIP.DAT reader.",
+    "PS1": "Coords parsed; rates need PRECIP.DAT.",
+    "IFORMP": "Precip format assumed.",
+    "NFLAGP": "Precip QC unused.",
+    "SEADAT": "SEA.DAT reader still TBD; COARE-lite uses air/SST bulk.",
+    "IWARM": "COARE warm-layer not in lite scheme.",
+    "ICOOL": "COARE cool-skin not in lite scheme.",
+    "THRESHW": "Overwater convective threshold unused in lite Zi.",
+    "ICLDOUT": "Cloud output file not written.",
+    "CLDDAT": "CLOUD.DAT reader unused (RH path does not need it).",
+    "IFORMC": "Cloud file format unused.",
+}
+for _k, _v in WP2_IMPLEMENTED.items():
+    IMPLEMENTED[_k] = _v
+    PARTIAL.pop(_k, None)
+    MISSING.pop(_k, None)
+for _k, _v in WP2_PARTIAL.items():
+    if _k not in IMPLEMENTED:
+        PARTIAL[_k] = _v
+        MISSING.pop(_k, None)
+
+
 # All remaining inventory names are at least accepted on CalmetConfig.
 # Mark former Missing as Partial "accepted, physics TBD" unless still truly absent.
 

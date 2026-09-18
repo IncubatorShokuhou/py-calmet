@@ -2,11 +2,12 @@
 
 Pure-NumPy diagnostic meteorological downscaling inspired by CALMET (CALPUFF system).
 
-## Status — v1 complete
+## Status — v1 + WP2 physics
 
-**v1.0.0** — diagnostic core with Fortran-aligned DIAGNO steps (Froude, slope,
-NSMTH smooth), Maul–Carson daytime ZI, CALMET.DAT/NetCDF writers, and two golden
-suites (`small_domain`, `wrf_demo`) plus a daytime convective ZI golden.
+**Coverage:** Implemented **72** / Partial **135** / Missing **0** (of 207 INP params).
+
+**v1.0** — diagnostic core + goldens. **WP2** — multi-station Barnes OA + RPROG,
+TOPOF2 IKINE, O'Brien IOBR, CLOUD3/4 RH clouds, NPSTA precip, COARE-lite overwater.
 
 | Case | Grid | Modes | Notes |
 |------|------|-------|-------|
@@ -17,17 +18,16 @@ suites (`small_domain`, `wrf_demo`) plus a daytime convective ZI golden.
 ### v1 complete
 
 - Readers + writers: GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT / NetCDF
-- Winds: 3D→CALMET geographic interp, power-law obs profiles (`similt_profile` helper exists, not wired), Barnes OA (R1/R2), **FRADJ**, **slope flow** (Mahrt/cdk=0.08), **NSMTH** smooth; **IOBR/IKINE-gated** divergence minimization
-- PBL: night ELUSTR+MIXHT; **daytime energy-budget QH + Maul–Carson ZI**; solar/QSW
+- Winds: 3D→CALMET interp, IEXTRP profiles (power-law / SIMILT), multi-station Barnes OA (R1/R2/RPROG/RMAX*/NINTR2), **FRADJ**, **slope**, **NSMTH**; **IKINE TOPOF2** + **IOBR O'Brien** (gated)
+- PBL: night ELUSTR+MIXHT; daytime energy-budget QH + Maul–Carson ZI; RH clouds (MCLOUD 3/4); NPSTA precip; COARE-lite overwater
 - Golden parity: tiny-domain tight; wrf_demo U/V corr ≳ 0.97 (noobs); daytime ZI corr ≳ 0.99 vs Fortran shape
 
-### Explicitly deferred to v2
+### Still Partial / next WPs
 
-- Full DIAGNO OA multi-station / RPROG blending refinements beyond single-station Barnes
 - Sounding-based lapse rates above ZI (MIXDT) — daytime growth uses DPTMIN gamma
-- IOUTMM5 variants beyond format 92; full cloud schemes (MCLOUD 2/3/4 detail)
-- Overwater **COARE** fluxes / OCD marine mixing heights
-- IKINE topographic vertical velocity + full O'Brien (IOBR=1) production tuning
+- Full Fairall COARE 3.0 (warm-layer/cool-skin); SEA.DAT reader
+- PRECIP.DAT station rates; CLOUD.DAT I/O; IOUTMM5 variants beyond format 92
+- Barriers / lake breeze; non-UTM projections; PACOUT / METLST writers
 - Raw wrfout in git (rebuild from NCAR tutorial; see `cases/wrf_demo/README.md`)
 
 

@@ -1,6 +1,16 @@
 # PROGRESS — py-calmet
 
-**Updated:** 2026-09-18 00:26 UTC (Asia/Shanghai)
+**Updated:** 2026-09-18 01:14 UTC
+
+## WP2 (this batch) — Partial→Implemented
+
+- Implemented **45 → 72** / Partial **162 → 135** / Missing **0** (of 207)
+- DIAGNO: multi-station Barnes OA + RPROG/RMAX*/NINTR2; IEXTRP modes (+4 SIMILT); ISURFT/SS*
+- IKINE: TOPOF2 kinematic W; IOBR: O'Brien + DIVLIM (gated; goldens IKINE=IOBR=0)
+- Clouds: CLOUD3 Teixeira + CLOUD4-lite; MCLOUD/ICLOUD 3/4 → QSW
+- Precip: NPSTA=-1 prognostic rain from 3D.DAT → RMM; station Barnes + SIGMAP/CUTP
+- Overwater: COARE-lite bulk fluxes (NOWSTA>0 gate; unit-tested)
+- pytest: **52+** green (goldens unchanged)
 
 ## Done (v1)
 

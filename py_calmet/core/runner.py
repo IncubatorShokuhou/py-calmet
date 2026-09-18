@@ -12,7 +12,7 @@ from ..io.up import read_up
 from ..io.threed import read_3d
 from ..io.inp import read_inp
 from .met_utils import layer_mids, coriolis, utm_to_latlon
-from . import winds, pbl
+from . import winds, pbl, clouds, precip, overwater
 
 
 @dataclass
@@ -132,6 +132,44 @@ def _resolve_data_file(inputs_dir: Path, case_dir: Path, name: str | None, fallb
     return None
 
 
+
+def _parse_surface_stations(inp, geo, nx, ny):
+    """Collect SS* station X/Y (km) and optional anemometer height.
+
+    Returns lists xs_km, ys_km (may be length 1 = domain center fallback).
+    ISURFT (1-based) selects which station is used for domain T when >0.
+    """
+    xs, ys = [], []
+    for key, val in sorted(inp.raw.items()):
+        if not key.startswith("SS") or not key[2:].isdigit():
+            continue
+        parts = str(val).replace("'", " ").split()
+        try:
+            # name id x y ...
+            x = float(parts[2]); y = float(parts[3])
+            xs.append(x); ys.append(y)
+        except Exception:
+            continue
+    if not xs:
+        xs = [geo.xorigkm + nx * geo.dgridkm / 2.0]
+        ys = [geo.yorigkm + ny * geo.dgridkm / 2.0]
+    return xs, ys
+
+
+def _parse_precip_stations(inp):
+    """PS* records → (xs_km, ys_km) lists; rates come from PRECIP.DAT later."""
+    xs, ys = [], []
+    for key, val in sorted(inp.raw.items()):
+        if not key.startswith("PS") or not key[2:].isdigit():
+            continue
+        parts = str(val).replace("'", " ").split()
+        try:
+            xs.append(float(parts[2])); ys.append(float(parts[3]))
+        except Exception:
+            continue
+    return xs, ys
+
+
 def run_calmet(
     case_dir: str | Path,
     mode: Optional[str] = None,
@@ -179,15 +217,13 @@ def run_calmet(
     up = read_up(up_path) if up_path is not None and mode != "noobs" else None
     threed = read_3d(m3d_path) if m3d_path is not None and mode != "obs" else None
 
-    xs_km = geo.xorigkm + nx * geo.dgridkm / 2.0
-    ys_km = geo.yorigkm + ny * geo.dgridkm / 2.0
-    if "SS1" in inp.raw:
-        parts = inp.raw["SS1"].replace("'", " ").split()
-        try:
-            xs_km = float(parts[2])
-            ys_km = float(parts[3])
-        except Exception:
-            pass
+    xs_list, ys_list = _parse_surface_stations(inp, geo, nx, ny)
+    xs_km, ys_km = xs_list[0], ys_list[0]
+    isurft = inp.get_int("ISURFT", 0)
+    iupt = inp.get_int("IUPT", 0)
+    # ISURFT 1-based station index for representative surface T / OA anchor
+    if isurft > 0 and isurft <= len(xs_list):
+        xs_km, ys_km = xs_list[isurft - 1], ys_list[isurft - 1]
 
     lat0, lon0 = _estimate_latlon(inp, geo, nx, ny)
     fcori = coriolis(float(lat0))
@@ -214,6 +250,21 @@ def run_calmet(
     iobr = inp.get_int("IOBR", 0)
     islope = inp.get_int("ISLOPE", 1)
     nsmth = inp.get_list_int("NSMTH") or ([2] + [4] * (nz - 1))
+    nintr2 = inp.get_list_int("NINTR2") or []
+    iextrp = inp.get_int("IEXTRP", -4)
+    fextr2 = inp.get_list_float("FEXTR2") or []
+    bias = inp.get_list_float("BIAS") or []
+    divlim = inp.get_float("DIVLIM", 5e-6)
+    mcloud = inp.get_int("MCLOUD", 0)
+    icloud = inp.get_int("ICLOUD", 0)
+    npsta = inp.get_int("NPSTA", 0)
+    sigmap = inp.get_float("SIGMAP", 100.0)
+    cutp = inp.get_float("CUTP", 0.01)
+    icoare = inp.get_int("ICOARE", 0)
+    dshelf = inp.get_float("DSHELF", 0.0)
+    constw = inp.get_float("CONSTW", 0.16)
+    ziminw = inp.get_float("ZIMINW", 50.0)
+    zimaxw = inp.get_float("ZIMAXW", 3000.0)
     # JWAT1/JWAT2 are the INP names; IWAT1/IWAT2 are GEO/header aliases.
     if cfg is not None and hasattr(cfg, "effective_iwat"):
         iwat1, iwat2 = cfg.effective_iwat()
@@ -260,7 +311,28 @@ def run_calmet(
                     temp2d[j, i] = threed.t2[ti, jj, ii]
                     irh[j, i] = int(threed.rh[ti, jj, ii, 0])
             sky = 0.0
-            ccfrac = 0.0
+            # RH-based clouds when MCLOUD/ICLOUD 3/4 — compute on 3D grid then map
+            rh_col = threed.rh[ti]  # (nj,ni,nk)
+            pr_col = threed.pres[ti]
+            cc_prog = clouds.resolve_cloud_fraction(
+                mcloud=mcloud,
+                icloud=icloud,
+                sky_tenths=0.0,
+                rh_3d=rh_col,
+                pres_3d=pr_col,
+                shape=(threed.nj, threed.ni),
+            )
+            method = mcloud if mcloud not in (0, 999) else icloud
+            if method in (3, 4) and np.ndim(cc_prog) == 2:
+                ccfrac = np.zeros((ny, nx), dtype=np.float64)
+                for j in range(ny):
+                    for i in range(nx):
+                        xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                        yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                        ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                        ccfrac[j, i] = float(cc_prog[jj, ii])
+            else:
+                ccfrac = 0.0
         elif mode == "obs":
             assert surf is not None and up is not None
             rec = surf.records[min(h, len(surf.records) - 1)]
@@ -285,10 +357,15 @@ def run_calmet(
                 zimin=zimin,
                 nx=nx,
                 ny=ny,
+                iextrp=iextrp,
+                fextr2=fextr2,
+                bias=bias,
             )
             sky = rec.sky
             irh = np.full((ny, nx), rec.rh, dtype=np.int32)
-            ccfrac = 0.1 * float(rec.sky)
+            ccfrac = clouds.resolve_cloud_fraction(
+                mcloud=mcloud, icloud=icloud, sky_tenths=rec.sky, shape=(ny, nx)
+            )
         else:  # obs_model
             assert surf is not None and up is not None and threed is not None
             ti = min(h, threed.wd.shape[0] - 1)
@@ -317,14 +394,24 @@ def run_calmet(
                 zimin=zimin,
                 nx=nx,
                 ny=ny,
+                iextrp=iextrp,
+                fextr2=fextr2,
+                bias=bias,
             )
+            # Multi-station OA when several SS* present; else single-station (golden path)
+            if len(xs_list) > 1:
+                xs_m = np.asarray(xs_list, dtype=np.float64) * 1000.0
+                ys_m = np.asarray(ys_list, dtype=np.float64) * 1000.0
+            else:
+                xs_m = xs_km * 1000.0
+                ys_m = ys_km * 1000.0
             U, V = winds.objective_analyze(
                 Ug,
                 Vg,
                 Uo,
                 Vo,
-                xs_m=xs_km * 1000.0,
-                ys_m=ys_km * 1000.0,
+                xs_m=xs_m,
+                ys_m=ys_m,
                 xorig_m=geo.xorigkm * 1000.0,
                 yorig_m=geo.yorigkm * 1000.0,
                 dgrid_m=dgrid_m,
@@ -333,10 +420,27 @@ def run_calmet(
                 rprog_m=rprog_km * 1000.0,
                 rmax1_m=(rmax1_km * 1000.0) if rmax1_km > 0 else None,
                 rmax2_m=(rmax2_km * 1000.0) if rmax2_km > 0 else None,
+                nintr2=nintr2 or None,
             )
             sky = rec.sky
             irh = np.full((ny, nx), rec.rh, dtype=np.int32)
-            ccfrac = 0.1 * float(rec.sky)
+            method = mcloud if mcloud not in (0, 999) else icloud
+            if method in (3, 4) and threed is not None:
+                cc_prog = clouds.resolve_cloud_fraction(
+                    mcloud=mcloud, icloud=icloud, rh_3d=threed.rh[ti], pres_3d=threed.pres[ti],
+                    shape=(threed.nj, threed.ni),
+                )
+                ccfrac = np.zeros((ny, nx), dtype=np.float64)
+                for j in range(ny):
+                    for i in range(nx):
+                        xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                        yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                        ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                        ccfrac[j, i] = float(cc_prog[jj, ii])
+            else:
+                ccfrac = clouds.resolve_cloud_fraction(
+                    mcloud=mcloud, icloud=icloud, sky_tenths=rec.sky, shape=(ny, nx),
+                )
 
         # Solar / short-wave (drives daytime PBL + slope qh sign)
         sinalp = pbl.sine_solar_elevation(lat0, lon0, jday, float(hour), ibtz=ibtz)
@@ -370,10 +474,16 @@ def run_calmet(
             U, V = winds.froude_adjust(
                 U, V, elev, zface, temp2d, dgrid_m, gamma=gamma, critfn=critfn, terrad_km=terrad
             )
-        # 2) Kinematic / O'Brien only if flagged
+        # 2) Kinematic TOPOF2 W + optional minim (IKINE); O'Brien after smooth
+        W_topo = None
         if ikine == 1:
-            U, V = winds.light_terrain_adjust(U, V, elev, dgrid_m, alpha=alpha)
-            U, V = winds.divergence_minimize(U, V, dgrid_m, niter=min(niter, 30), alpha=0.5)
+            gamma_k = 0.01 if not daytime else 0.005
+            W_topo = winds.topographic_kinematic_w(
+                U, V, elev, zface, temp2d, dgrid_m, alpha=alpha, gamma=gamma_k
+            )
+            U, V = winds.divergence_minimize(
+                U, V, dgrid_m, niter=min(niter, 30), divlim=divlim, W=W_topo, zface=zface
+            )
         # 3) Slope flow
         if islope == 1:
             Us, Vs = winds.slope_flow(
@@ -394,7 +504,12 @@ def run_calmet(
         U, V = winds.smooth_winds(U, V, nsmth=nsmth)
         # 5) Optional O'Brien after smooth
         if iobr == 1:
-            U, V = winds.divergence_minimize(U, V, dgrid_m, niter=min(niter, 50), alpha=0.5)
+            W_pre = winds.vertical_velocity_from_div(U, V, zface, dgrid_m)
+            if W_topo is not None:
+                W_pre = W_pre + W_topo
+            U, V, _Wob = winds.obrien_adjust(
+                U, V, W_pre, zface, dgrid_m, niter=min(niter, 50), divlim=divlim
+            )
 
         # Recompute ustar/el/zi from final near-surface winds (post-DIAGNO)
         qh_eb = pbl.heat_flux_energy_budget(
@@ -436,6 +551,16 @@ def run_calmet(
         zi = zi * (1.0 + 0.002 * (elev - elev.mean()) / max(float(elev.std()), 1.0))
         zi = np.clip(zi, zimin, zimax)
 
+        # Overwater COARE-lite when ICOARE≠0 and overwater stations/SEA path
+        # engaged (NOWSTA>0). Goldens use NOWSTA=0 → land PBL retained.
+        nowsta = inp.get_int("NOWSTA", 0)
+        if icoare != 0 and nowsta > 0:
+            ustar, el, qh, zi = overwater.apply_overwater_pbl(
+                geo.landuse, iwat1, iwat2, U[0], V[0], temp2d, rho,
+                ustar, el, qh, zi, fcori,
+                icoare=icoare, constw=constw, ziminw=ziminw, zimaxw=zimaxw, dshelf=dshelf,
+            )
+
         # Recompute MO length from the QH actually stored (energy-budget by
         # day, ELUSTR by night) so EL and QH are consistent.
         qh_safe = np.where(np.abs(qh) < 1e-8, np.where(qh >= 0.0, 1e-8, -1e-8), qh)
@@ -445,12 +570,30 @@ def run_calmet(
         ipgt = pbl.ipgt_from_el(el)
         wstar = pbl.wstar_field(ziconv, qh, temp2d, rho)
         W = winds.vertical_velocity_from_div(U, V, zface, dgrid_m)
+        if W_topo is not None:
+            W = W + W_topo
 
         T = np.zeros((nz, ny, nx))
         for L, zm in enumerate(zmid):
             T[L] = temp2d - 0.0065 * zm
 
-        rmm = np.zeros((ny, nx), dtype=np.float64)
+        rain_prog = None
+        if threed is not None and hasattr(threed, "rain"):
+            ti_r = min(h, threed.rain.shape[0] - 1)
+            rain_prog = threed.rain[ti_r]
+        # NPSTA: -1 prognostic, 0 none, >0 station OA (rates default 0 without PRECIP.DAT)
+        rmm = precip.resolve_precip(
+            npsta=npsta,
+            nx=nx,
+            ny=ny,
+            rain_prog=rain_prog,
+            threed=threed,
+            xorig_km=geo.xorigkm,
+            yorig_km=geo.yorigkm,
+            dgrid_km=geo.dgridkm,
+            sigmap_km=sigmap,
+            cutp=cutp,
+        )
 
         U_all.append(U)
         V_all.append(V)
@@ -494,5 +637,12 @@ def run_calmet(
             "nsecdt": nsecdt,
             "lat0": lat0,
             "lon0": lon0,
+            "isurft": isurft,
+            "iupt": iupt,
+            "iextrp": iextrp,
+            "mcloud": mcloud,
+            "icloud": icloud,
+            "npsta": npsta,
+            "icoare": icoare,
         },
     )

@@ -83,15 +83,23 @@ def obs_profile_similt(
     nx: int,
     ny: int,
     p_exp: float = 0.17,
+    iextrp: int = -4,
+    fextr2: list[float] | np.ndarray | None = None,
+    bias: list[float] | np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Obs vertical profile: power-law speed + UA direction blend.
+    """Obs vertical profile controlled by IEXTRP.
 
-    ``z0`` / ``el`` / ``zi`` / ``zimin`` are kept for API compatibility with a
-    future SIMILT path (``core.similt.similt_profile``). v1 goldens were tuned
-    against this power-law blend, so SIMILT is not wired in here.
+    * ``IEXTRP = ±1``: surface wind in layer 0 only; aloft from UA sounding.
+    * ``IEXTRP = ±2`` or ``-4`` (golden-safe): power-law speed + UA direction blend.
+    * ``IEXTRP = ±3``: apply FEXTR2 layer factors to surface wind.
+    * ``IEXTRP = +4``: Van Ulden–Holtslag SIMILT below Zi; UA above.
+
+    Negative IEXTRP applies optional layer ``BIAS`` (additive m/s on speed).
     """
-    _ = (z0, el, zi, zimin)
+    from . import similt as _similt
+
     zmid = layer_mids(zface)
+    nz = len(zmid)
     z_agl = np.array([lev.height - stn_elev for lev in sounding_levels], dtype=np.float64)
     wd = np.array([lev.wd for lev in sounding_levels], dtype=np.float64)
     ws = np.array([lev.ws for lev in sounding_levels], dtype=np.float64)
@@ -103,27 +111,65 @@ def obs_profile_similt(
     ws1 = float(np.hypot(u_sfc, v_sfc))
     u_s = float(u_sfc / max(ws1, 1e-6))
     v_s = float(v_sfc / max(ws1, 1e-6))
-    U = np.zeros((len(zmid), ny, nx))
+    U = np.zeros((nz, ny, nx))
     V = np.zeros_like(U)
-    for L, zm in enumerate(zmid):
-        if L == 0:
-            U[L], V[L] = u_sfc, v_sfc
-            continue
-        spd = ws1 * (zm / z_anem) ** p_exp
-        u_ua = float(np.interp(zm, z_agl, uu))
-        v_ua = float(np.interp(zm, z_agl, vv))
-        spd_ua = float(np.hypot(u_ua, v_ua))
-        w = min(1.0, np.log(max(zm, z_anem) / z_anem) / np.log(80.0))
-        spd = (1.0 - 0.4 * w) * spd + 0.4 * w * spd_ua
-        # Blend direction on unit vectors so 350° vs 10° does not go the long way.
-        u_a = u_ua / max(spd_ua, 1e-6)
-        v_a = v_ua / max(spd_ua, 1e-6)
-        bu = (1.0 - w) * u_s + w * u_a
-        bv = (1.0 - w) * v_s + w * v_a
-        wdir = float(np.rad2deg(np.arctan2(-bu, -bv)) % 360.0)
-        u, v = wind_uv(wdir, spd)
-        U[L] = u
-        V[L] = v
+    mode = abs(int(iextrp))
+
+    if mode == 4 and int(iextrp) > 0:
+        # True SIMILT (positive IEXTRP=4 only; -4 keeps golden power-law)
+        us, vs = _similt.similt_profile(
+            u_sfc, v_sfc, z_anem, max(z0, 1e-4), el, zi, zmid, zimin=zimin
+        )
+        for L, zm in enumerate(zmid):
+            if np.isnan(us[L]):
+                u_ua = float(np.interp(zm, z_agl, uu))
+                v_ua = float(np.interp(zm, z_agl, vv))
+                U[L], V[L] = u_ua, v_ua
+            else:
+                U[L], V[L] = float(us[L]), float(vs[L])
+    elif mode == 1:
+        for L, zm in enumerate(zmid):
+            if L == 0:
+                U[L], V[L] = u_sfc, v_sfc
+            else:
+                U[L] = float(np.interp(zm, z_agl, uu))
+                V[L] = float(np.interp(zm, z_agl, vv))
+    elif mode == 3:
+        fx = list(fextr2) if fextr2 is not None else [1.0] * nz
+        fx = fx + [fx[-1]] * max(0, nz - len(fx))
+        for L in range(nz):
+            U[L] = u_sfc * float(fx[L])
+            V[L] = v_sfc * float(fx[L])
+    else:
+        # ±2 and -4 (and unknown): golden-tuned power-law blend
+        for L, zm in enumerate(zmid):
+            if L == 0:
+                U[L], V[L] = u_sfc, v_sfc
+                continue
+            spd = ws1 * (zm / z_anem) ** p_exp
+            u_ua = float(np.interp(zm, z_agl, uu))
+            v_ua = float(np.interp(zm, z_agl, vv))
+            spd_ua = float(np.hypot(u_ua, v_ua))
+            w = min(1.0, np.log(max(zm, z_anem) / z_anem) / np.log(80.0))
+            spd = (1.0 - 0.4 * w) * spd + 0.4 * w * spd_ua
+            u_a = u_ua / max(spd_ua, 1e-6)
+            v_a = v_ua / max(spd_ua, 1e-6)
+            bu = (1.0 - w) * u_s + w * u_a
+            bv = (1.0 - w) * v_s + w * v_a
+            wdir = float(np.rad2deg(np.arctan2(-bu, -bv)) % 360.0)
+            u, v = wind_uv(wdir, spd)
+            U[L] = u
+            V[L] = v
+
+    if int(iextrp) < 0 and bias is not None and len(bias) > 0:
+        b = list(bias) + [0.0] * max(0, nz - len(bias))
+        for L in range(nz):
+            spd = float(np.hypot(U[L, 0, 0], V[L, 0, 0]))
+            if spd < 1e-9:
+                continue
+            scale = (spd + float(b[L])) / spd
+            U[L] *= scale
+            V[L] *= scale
     return U, V
 
 
@@ -142,6 +188,7 @@ def objective_analyze(
     rprog_m: float = 0.0,
     rmax1_m: float | None = None,
     rmax2_m: float | None = None,
+    nintr2: list[int] | np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Barnes-like OA of obs onto IGF (IPROG=14 style).
 
@@ -221,6 +268,14 @@ def objective_analyze(
                 w_stn = np.exp(-dist2 / max(rk, 1.0) ** 2)
                 if rmax is not None and rmax > 0:
                     w_stn = np.where(np.sqrt(dist2) <= rmax, w_stn, 0.0)
+                if nintr2 is not None:
+                    nmax = int(nintr2[k]) if k < len(nintr2) else int(nintr2[-1])
+                    if nmax > 0 and nmax < w_stn.size:
+                        # Keep only the nmax nearest stations
+                        order = np.argsort(dist2)
+                        mask = np.zeros_like(w_stn, dtype=bool)
+                        mask[order[:nmax]] = True
+                        w_stn = np.where(mask, w_stn, 0.0)
                 num_u = float(np.dot(w_stn, u_stn[:, k]))
                 num_v = float(np.dot(w_stn, v_stn[:, k]))
                 den = float(w_stn.sum())
@@ -236,6 +291,71 @@ def objective_analyze(
     return U, V
 
 
+def topographic_kinematic_w(
+    U: np.ndarray,
+    V: np.ndarray,
+    elev: np.ndarray,
+    zface: np.ndarray,
+    tempk: np.ndarray,
+    dgrid_m: float,
+    alpha: float = 0.1,
+    gamma: float | np.ndarray = 0.01,
+) -> np.ndarray:
+    """TOPOF2-style terrain-induced vertical velocity (IKINE=1).
+
+    Computes stability-dependent exponential decay of slope-forced W
+    (Yocke 1979 / CALMET TOPOF2), returned at layer midpoints ``(nz,ny,nx)``.
+    Does **not** modify U,V — pair with ``divergence_minimize`` / O'Brien.
+    """
+    nz, ny, nx = U.shape
+    if np.isscalar(gamma):
+        gam2d = np.full((ny, nx), float(gamma), dtype=np.float64)
+    else:
+        gam2d = np.asarray(gamma, dtype=np.float64)
+    tau = -0.01
+    hinv = 500.0
+    W_face = np.zeros((nz + 1, ny, nx), dtype=np.float64)
+    dzi = 0.5 / dgrid_m
+    for j in range(ny):
+        for i in range(nx):
+            temp = float(max(tempk[j, i], 200.0))
+            gamma2 = float(gam2d[j, i]) - tau
+            if gamma2 < 0.0:
+                s = -1.0
+            else:
+                s = float(np.sqrt(9.8 * gamma2 / temp))
+            xws = float(np.hypot(U[nz - 1, j, i], V[nz - 1, j, i]))
+            xws = max(xws, 1e-6)
+            bk = 2.0 / hinv if s <= 0.0 else s / xws
+            im1 = elev[j, i - 1] if i > 0 else elev[j, i]
+            ip1 = elev[j, i + 1] if i < nx - 1 else elev[j, i]
+            jm1 = elev[j - 1, i] if j > 0 else elev[j, i]
+            jp1 = elev[j + 1, i] if j < ny - 1 else elev[j, i]
+            delhi = (ip1 - im1) * dzi
+            delhj = (jp1 - jm1) * dzi
+            wtopo = float(U[0, j, i] * delhi + V[0, j, i] * delhj)
+            w1 = np.zeros(nz + 1, dtype=np.float64)
+            w1[0] = wtopo
+            w_tf = np.zeros(nz + 1, dtype=np.float64)
+            w_tf[0] = wtopo
+            for k in range(nz):
+                bkz = min(bk * float(zface[k + 1]), 50.0)
+                w1[k + 1] = wtopo * np.exp(-bkz)
+                dz = float(zface[k + 1] - zface[k])
+                dwdz1 = (w1[k + 1] - w1[k]) / max(dz, 1e-6)
+                dwdz = alpha * dwdz1
+                w_tf[k + 1] = dwdz * dz + w_tf[k]
+            # Terrain-following transform
+            w_tf[0] = w_tf[0] - U[0, j, i] * delhi - V[0, j, i] * delhj
+            for k in range(nz):
+                w_tf[k + 1] = w_tf[k + 1] - U[k, j, i] * delhi - V[k, j, i] * delhj
+            W_face[:, j, i] = w_tf
+    W = np.zeros((nz, ny, nx), dtype=np.float64)
+    for k in range(nz):
+        W[k] = 0.5 * (W_face[k] + W_face[k + 1])
+    return W
+
+
 def light_terrain_adjust(
     U: np.ndarray,
     V: np.ndarray,
@@ -243,7 +363,7 @@ def light_terrain_adjust(
     dgrid_m: float,
     alpha: float = 0.1,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Light kinematic tilt of near-surface wind along terrain gradient (IKINE path)."""
+    """Legacy near-surface tilt (pre-TOPOF2). Prefer topographic_kinematic_w."""
     Uo, Vo = U.copy(), V.copy()
     dzdx = np.gradient(elev, dgrid_m, axis=1)
     dzdy = np.gradient(elev, dgrid_m, axis=0)
@@ -494,34 +614,88 @@ def divergence_minimize(
     niter: int = 50,
     alpha: float = 0.5,
     terrain: np.ndarray | None = None,
+    divlim: float = 5e-6,
+    W: np.ndarray | None = None,
+    zface: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """O'Brien / DIAGNO-style iterative divergence reduction on each layer.
+    """O'Brien / MINIM-style iterative divergence reduction (IOBR=1).
 
-    Only used when IOBR=1 (or IKINE=1 via TOPOF2+MINIM). Default case configs
-    set IOBR=0, so this is typically skipped by the runner.
+    Per-layer Poisson adjustment of U,V until |div| ≤ ``divlim`` or ``niter``.
+    When ``W`` and ``zface`` are supplied, vertical derivative ∂W/∂z is included
+    in the divergence (anelastic continuity) — the O'Brien coupling path.
+    Gated off when IOBR=0 (runner); goldens keep IOBR=0.
     """
+    _ = terrain
     Uo, Vo = U.copy(), V.copy()
     nz, ny, nx = U.shape
     dx = dgrid_m
     for k in range(nz):
         u = Uo[k]
         v = Vo[k]
-        phi = np.zeros((ny, nx), dtype=np.float64)
-        for _ in range(niter):
+        for it in range(niter):
             div = np.gradient(u, dx, axis=1) + np.gradient(v, dx, axis=0)
-            phi_new = phi.copy()
-            if ny > 2 and nx > 2:
-                neigh = (
-                    phi[:-2, 1:-1]
-                    + phi[2:, 1:-1]
-                    + phi[1:-1, :-2]
-                    + phi[1:-1, 2:]
-                )
-                phi_new[1:-1, 1:-1] = 0.25 * (neigh - div[1:-1, 1:-1] * dx * dx)
-            phi = (1.0 - alpha) * phi + alpha * phi_new
-        Uo[k] = u - np.gradient(phi, dx, axis=1)
-        Vo[k] = v - np.gradient(phi, dx, axis=0)
+            if W is not None and zface is not None:
+                dz = float(zface[k + 1] - zface[k])
+                if k == 0:
+                    dwdz = (W[k] - 0.0) / max(dz, 1e-6)
+                else:
+                    dwdz = (W[k] - W[k - 1]) / max(dz, 1e-6)
+                div = div + dwdz
+            divmax = float(np.max(np.abs(div)))
+            if divmax <= divlim:
+                break
+            # Four-pass directional adjustment (CALMET MINIM-inspired)
+            for _idir in range(4):
+                for j in range(ny):
+                    for i in range(nx):
+                        d = div[j, i]
+                        if abs(d) < 1e-20:
+                            continue
+                        ut = -0.5 * d * dx  # alpha1..4 = 0.5 → AL=2 → factor 0.5
+                        vt = -0.5 * d * dx
+                        if i + 1 < nx:
+                            u[j, i + 1] += 0.5 * ut
+                        if i - 1 >= 0:
+                            u[j, i - 1] -= 0.5 * ut
+                        if j + 1 < ny:
+                            v[j + 1, i] += 0.5 * vt
+                        if j - 1 >= 0:
+                            v[j - 1, i] -= 0.5 * vt
+                div = np.gradient(u, dx, axis=1) + np.gradient(v, dx, axis=0)
+                if W is not None and zface is not None:
+                    dz = float(zface[k + 1] - zface[k])
+                    if k == 0:
+                        dwdz = W[k] / max(dz, 1e-6)
+                    else:
+                        dwdz = (W[k] - W[k - 1]) / max(dz, 1e-6)
+                    div = div + dwdz
+        Uo[k] = u
+        Vo[k] = v
     return Uo, Vo
+
+
+def obrien_adjust(
+    U: np.ndarray,
+    V: np.ndarray,
+    W: np.ndarray,
+    zface: np.ndarray,
+    dgrid_m: float,
+    niter: int = 50,
+    divlim: float = 5e-6,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Full O'Brien path: adjust U,V for continuity including kinematic W, then rebuild W."""
+    U2, V2 = divergence_minimize(
+        U, V, dgrid_m, niter=niter, divlim=divlim, W=W, zface=zface
+    )
+    W2 = vertical_velocity_from_div(U2, V2, zface, dgrid_m)
+    # Blend top boundary: force W_top → 0 (classic O'Brien)
+    nz = U2.shape[0]
+    if nz >= 2:
+        w_top = W2[-1]
+        for k in range(nz):
+            fac = float(k) / float(nz - 1) if nz > 1 else 1.0
+            W2[k] = W2[k] - fac * w_top
+    return U2, V2, W2
 
 
 def vertical_velocity_from_div(
