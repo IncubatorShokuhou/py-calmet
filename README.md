@@ -30,6 +30,13 @@ suites (`small_domain`, `wrf_demo`) plus a daytime convective ZI golden.
 - IKINE topographic vertical velocity + full O'Brien (IOBR=1) production tuning
 - Raw wrfout in git (rebuild from NCAR tutorial; see `cases/wrf_demo/README.md`)
 
+
+## Design principles
+
+- **Correctness over bit-identical Fortran ports.** Match Fortran goldens closely enough that core fields are trustworthy; do not chase bit-identical outputs.
+- **Prefer NumPy / SciPy (and similar well-known libraries)** when they already implement the same math. A mechanical 1:1 Fortran translation is not a goal and would not guarantee identical floats anyway.
+- **Regression gates** (relative RMSE / correlation in `tests/thresholds.py`) catch real regressions without over-fitting every grid cell.
+
 ## Install
 
 ```bash
