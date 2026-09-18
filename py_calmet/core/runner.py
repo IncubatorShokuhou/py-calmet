@@ -118,6 +118,20 @@ def _ibtz_from_abtz(abtz: str) -> int:
     return sign * hours
 
 
+def _resolve_data_file(inputs_dir: Path, case_dir: Path, name: str | None, fallback: str) -> Path | None:
+    """Honor INP filename when present; search case_dir then inputs_dir."""
+    candidates: list[Path] = []
+    if name:
+        n = str(name).strip().strip("'\"" )
+        if n:
+            candidates.extend([case_dir / n, inputs_dir / n, Path(n)])
+    candidates.extend([case_dir / fallback, inputs_dir / fallback])
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
 def run_calmet(
     case_dir: str | Path,
     mode: Optional[str] = None,
@@ -136,7 +150,14 @@ def run_calmet(
                 break
     inputs_dir = Path(inputs_dir)
 
-    geo = read_geo(inputs_dir / "geo.dat")
+    cfg = getattr(inp, "config", None)
+    if cfg is not None and hasattr(cfg, "check_unsupported"):
+        cfg.check_unsupported()
+
+    geo_path = _resolve_data_file(inputs_dir, case_dir, inp.get("GEODAT"), "geo.dat")
+    if geo_path is None:
+        raise FileNotFoundError(f"GEODAT/geo.dat not found under {case_dir} or {inputs_dir}")
+    geo = read_geo(geo_path)
     nx, ny = geo.nx, geo.ny
     zface = np.asarray(
         inp.get_list_float("ZFACE") or [0, 20, 40, 80, 160, 300, 600, 1000, 1500],
@@ -150,21 +171,13 @@ def run_calmet(
     start, _end, nhrs, nsecdt = _run_window(inp)
     ibyr, ibmo, ibdy = start.year, start.month, start.day
 
-    surf = (
-        read_surf(inputs_dir / "surf.dat")
-        if (inputs_dir / "surf.dat").exists() and mode != "noobs"
-        else None
-    )
-    up = (
-        read_up(inputs_dir / "up.dat")
-        if (inputs_dir / "up.dat").exists() and mode != "noobs"
-        else None
-    )
-    threed = (
-        read_3d(inputs_dir / "3d.dat")
-        if (inputs_dir / "3d.dat").exists() and mode != "obs"
-        else None
-    )
+    srf_path = _resolve_data_file(inputs_dir, case_dir, inp.get("SRFDAT"), "surf.dat")
+    up_path = _resolve_data_file(inputs_dir, case_dir, inp.get("UPDAT"), "up.dat")
+    m3d_path = _resolve_data_file(inputs_dir, case_dir, inp.get("M3DDAT"), "3d.dat")
+
+    surf = read_surf(srf_path) if srf_path is not None and mode != "noobs" else None
+    up = read_up(up_path) if up_path is not None and mode != "noobs" else None
+    threed = read_3d(m3d_path) if m3d_path is not None and mode != "obs" else None
 
     xs_km = geo.xorigkm + nx * geo.dgridkm / 2.0
     ys_km = geo.yorigkm + ny * geo.dgridkm / 2.0
@@ -198,8 +211,22 @@ def run_calmet(
     iobr = inp.get_int("IOBR", 0)
     islope = inp.get_int("ISLOPE", 1)
     nsmth = inp.get_list_int("NSMTH") or ([2] + [4] * (nz - 1))
-    iwat1 = inp.get_int("IWAT1", 55)
-    iwat2 = inp.get_int("IWAT2", 55)
+    # JWAT1/JWAT2 are the INP names; IWAT1/IWAT2 are GEO/header aliases.
+    if cfg is not None and hasattr(cfg, "effective_iwat"):
+        iwat1, iwat2 = cfg.effective_iwat()
+    else:
+        j1 = inp.get_int("JWAT1", inp.get_int("IWAT1", 999))
+        j2 = inp.get_int("JWAT2", inp.get_int("IWAT2", 999))
+        iwat1, iwat2 = (55, 55) if (j1 == 999 and j2 == 999) else (j1, j2)
+
+    ha1 = inp.get_float("HA1", 990.0)
+    ha2 = inp.get_float("HA2", -30.0)
+    hb1 = inp.get_float("HB1", -0.75)
+    hb2 = inp.get_float("HB2", 3.4)
+    hc1 = inp.get_float("HC1", 5.31e-13)
+    hc2 = inp.get_float("HC2", 60.0)
+    hc3 = inp.get_float("HC3", 0.12)
+    metdat_name = (inp.get("METDAT") or "CALMET.DAT")
 
     U_all, V_all = [], []
     IPGT_all, USTAR_all, ZI_all, EL_all, WSTAR_all = [], [], [], [], []
@@ -309,7 +336,7 @@ def run_calmet(
         sinalp = pbl.sine_solar_elevation(lat0, lon0, jday, float(hour), ibtz=ibtz)
         if np.ndim(sinalp) == 0:
             sinalp = np.full((ny, nx), float(sinalp))
-        qsw = pbl.shortwave_radiation(sinalp, ccfrac)
+        qsw = pbl.shortwave_radiation(sinalp, ccfrac, ha1=ha1, ha2=ha2, hb1=hb1, hb2=hb2)
 
         # surface thermo for flux
         if mode == "noobs":
@@ -322,7 +349,7 @@ def run_calmet(
 
         # Energy-budget qh for slope-flow sign (HEATFX). Full PBL after DIAGNO.
         qh_eb = pbl.heat_flux_energy_budget(
-            qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2
+            qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2, hc1=hc1, hc2=hc2, hc3=hc3
         )
         ust_n, el_n, qh_n = pbl.elustr_stable(U[0], V[0], z0, float(zmid[0]), temp2d, rho, sky)
         day_cell = qh_eb > 0.0
@@ -365,7 +392,7 @@ def run_calmet(
 
         # Recompute ustar/el/zi from final near-surface winds (post-DIAGNO)
         qh_eb = pbl.heat_flux_energy_budget(
-            qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2
+            qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2, hc1=hc1, hc2=hc2, hc3=hc3
         )
         ust_n, el_n, qh_n = pbl.elustr_stable(U[0], V[0], z0, float(zmid[0]), temp2d, rho, sky)
         ust_d, el_d, _ = pbl.elustr_unstable(U[0], V[0], z0, float(zmid[0]), temp2d, rho, qsw)

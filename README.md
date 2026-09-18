@@ -33,9 +33,13 @@ suites (`small_domain`, `wrf_demo`) plus a daytime convective ZI golden.
 
 ## Design principles
 
+- **Full Fortran CALMET feature + parameter-API parity.** Every INP/control parameter is accepted on `CalmetConfig` (207 keys); physics may still be Partial/TBD, but silent wrong-results for selected switches raise `NotImplementedError`. Bit-identical floats are **not** required.
 - **Correctness over bit-identical Fortran ports.** Match Fortran goldens closely enough that core fields are trustworthy; do not chase bit-identical outputs.
-- **Prefer NumPy / SciPy (and similar well-known libraries)** when they already implement the same math. A mechanical 1:1 Fortran translation is not a goal and would not guarantee identical floats anyway.
+- **Prefer NumPy / SciPy** for math kernels; **datetime** for time; **pathlib/os** for I/O; idiomatic Python over mechanical Fortran translation.
+- **WRF / NetCDF:** optional `xarray` + `wrf-python` (+ `netCDF4`) for wrfout→3D.DAT and NetCDF writers (`pip install 'py-calmet[wrf]'`).
 - **Regression gates** (relative RMSE / correlation in `tests/thresholds.py`) catch real regressions without over-fitting every grid cell.
+
+See [`docs/calmet-inp-coverage.md`](docs/calmet-inp-coverage.md) for the live Implemented / Partial / Missing matrix.
 
 ## Install
 

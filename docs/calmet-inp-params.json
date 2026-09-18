@@ -1,0 +1,3320 @@
+{
+  "meta": {
+    "generated": "2026-09-18 01:07 UTC",
+    "fortran_source": "vendor/calmet-fortran/src/calmet.for (READCF CVDIC groups 1\u20136 + READFN IG0 + station freeform)",
+    "python_package": "py_calmet/",
+    "sample_inp_glob": "cases/**/calmet.inp",
+    "sample_inp_count": 14,
+    "counts": {
+      "total": 207,
+      "implemented": 43,
+      "partial": 164,
+      "missing": 0
+    },
+    "notes": [
+      "Station keys SS1/US1/PS1 represent free-format SSn/USn/PSn records.",
+      "ICLOUD vs MCLOUD/ICLDOUT: older vs INP 2.2 naming; both listed.",
+      "ISTEPPG legacy hours vs ISTEPPGS seconds.",
+      "JWAT1/JWAT2 are INP names; CALMET.DAT / GEO use iwat1/iwat2 \u2014 wire alias.",
+      "IOUTMM5 is a 3D.DAT header flag, not an INP variable \u2014 see roadmap.",
+      "Time: prefer datetime for run windows; Julian packing only at CALMET.DAT wire boundary.",
+      "I/O: prefer pathlib/os stdlib; idiomatic Python over Fortran control-flow ports."
+    ],
+    "dependencies": {
+      "math": [
+        "numpy",
+        "scipy"
+      ],
+      "wrf_netcdf": [
+        "xarray",
+        "wrf-python",
+        "netCDF4"
+      ],
+      "stdlib": [
+        "datetime",
+        "os",
+        "pathlib"
+      ],
+      "policy": "Full Fortran CALMET feature surface + all INP parameter interfaces; bit-identical not required. NumPy/SciPy for math kernels; wrf-python + xarray for WRF/NetCDF; datetime for time; idiomatic Python OK if behavior/API parity holds."
+    }
+  },
+  "parameters": [
+    {
+      "name": "METINP",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "files.metinp"
+    },
+    {
+      "name": "GEODAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Honored via _resolve_data_file (case_dir / inputs_dir).",
+      "api_field": "files.geodat"
+    },
+    {
+      "name": "SRFDAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Honored via _resolve_data_file.",
+      "api_field": "files.srfdat"
+    },
+    {
+      "name": "PRCDAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (PRECIP.DAT unused.)",
+      "api_field": "files.prcdat"
+    },
+    {
+      "name": "MM4DAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy MM4 name; use M3DDAT.)",
+      "api_field": "files.mm4dat"
+    },
+    {
+      "name": "WTDAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (WT.DAT unused.)",
+      "api_field": "files.wtdat"
+    },
+    {
+      "name": "METLST",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Parsed + exposed; list-file writer not yet implemented.",
+      "api_field": "files.metlst"
+    },
+    {
+      "name": "METDAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Parsed + exposed; output path still selected by caller/API (not auto-written to METDAT).",
+      "api_field": "files.metdat"
+    },
+    {
+      "name": "PACDAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (MESOPUFF PACOUT unused.)",
+      "api_field": "files.pacdat"
+    },
+    {
+      "name": "CLDDAT",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (CLOUD.DAT reader unused.)",
+      "api_field": "files.clddat"
+    },
+    {
+      "name": "LCFILES",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Parsed; paths used as-is (case folding unused).",
+      "api_field": "files.lcfiles"
+    },
+    {
+      "name": "NUSTA",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Parsed; multi-station UP still single-file path.",
+      "api_field": "files.nusta"
+    },
+    {
+      "name": "NOWSTA",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Parsed on config; SEA.DAT physics TBD.",
+      "api_field": "files.nowsta"
+    },
+    {
+      "name": "NM3D",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Parsed; single 3d.dat path honored.",
+      "api_field": "files.nm3d"
+    },
+    {
+      "name": "NIGF",
+      "group": "0a",
+      "group_title": "File names \u2014 primary I/O (READFN subgroup a)",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Parsed on config; IGF reader TBD.",
+      "api_field": "files.nigf"
+    },
+    {
+      "name": "UPDAT",
+      "group": "0b",
+      "group_title": "Upper-air file names (READFN b)",
+      "type": "character",
+      "array": "per upper-air station",
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Honored via _resolve_data_file.",
+      "api_field": "files.updat"
+    },
+    {
+      "name": "SEADAT",
+      "group": "0c",
+      "group_title": "Overwater / SEA.DAT file names (READFN c)",
+      "type": "character",
+      "array": "per overwater station",
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (SEA.DAT unused.)",
+      "api_field": "files.seadat"
+    },
+    {
+      "name": "M3DDAT",
+      "group": "0d",
+      "group_title": "MM4/MM5/3D.DAT file names (READFN d)",
+      "type": "character",
+      "array": "per MM5/3D file",
+      "sources": [
+        "READFN",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Honored via _resolve_data_file (3d.dat).",
+      "api_field": "files.m3ddat"
+    },
+    {
+      "name": "IGFDAT",
+      "group": "0e",
+      "group_title": "IGF-CALMET.DAT file names (READFN e)",
+      "type": "character",
+      "array": "per IGF file",
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (IGF-CALMET files unused.)",
+      "api_field": "files.igfdat"
+    },
+    {
+      "name": "DIADAT",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (DIAG.DAT unused.)",
+      "api_field": "files.diadat"
+    },
+    {
+      "name": "PRGDAT",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (PROG.DAT unused.)",
+      "api_field": "files.prgdat"
+    },
+    {
+      "name": "TSTPRT",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Test files unused.)",
+      "api_field": "files.tstprt"
+    },
+    {
+      "name": "TSTOUT",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "files.tstout"
+    },
+    {
+      "name": "TSTKIN",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "files.tstkin"
+    },
+    {
+      "name": "TSTFRD",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "files.tstfrd"
+    },
+    {
+      "name": "TSTSLP",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "files.tstslp"
+    },
+    {
+      "name": "DCSTGD",
+      "group": "0f",
+      "group_title": "Misc diagnostic / test file names (READFN f)",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READFN"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "files.dcstgd"
+    },
+    {
+      "name": "IBYR",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window start year (datetime).",
+      "api_field": "run.start.year"
+    },
+    {
+      "name": "IBMO",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window start month.",
+      "api_field": "run.start.month"
+    },
+    {
+      "name": "IBDY",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window start day.",
+      "api_field": "run.start.day"
+    },
+    {
+      "name": "IBHR",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window start hour.",
+      "api_field": "run.start.hour"
+    },
+    {
+      "name": "IBSEC",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window start second.",
+      "api_field": "run.start.second"
+    },
+    {
+      "name": "IEYR",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window end year.",
+      "api_field": "run.end.year"
+    },
+    {
+      "name": "IEMO",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window end month.",
+      "api_field": "run.end.month"
+    },
+    {
+      "name": "IEDY",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window end day.",
+      "api_field": "run.end.day"
+    },
+    {
+      "name": "IEHR",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window end hour.",
+      "api_field": "run.end.hour"
+    },
+    {
+      "name": "IESEC",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Run window end second.",
+      "api_field": "run.end.second"
+    },
+    {
+      "name": "ABTZ",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "UTC offset \u2192 internal timezone hours.",
+      "api_field": "run.abtz"
+    },
+    {
+      "name": "IBTZ",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy; prefer ABTZ.)",
+      "api_field": "run.ibtz_legacy"
+    },
+    {
+      "name": "IRLG",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy run length; prefer begin/end + NSECDT.)",
+      "api_field": "run.irlg_legacy"
+    },
+    {
+      "name": "NSECDT",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Timestep seconds (datetime timedelta).",
+      "api_field": "run.nsecdt"
+    },
+    {
+      "name": "IRTYPE",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Run-type gating unused.)",
+      "api_field": "run.irtype"
+    },
+    {
+      "name": "LCALGRD",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Some CALGRID fields in writer; flag not read.",
+      "api_field": "output.lcalgrd"
+    },
+    {
+      "name": "ITEST",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Setup-only stop unused.)",
+      "api_field": "run.itest"
+    },
+    {
+      "name": "MREG",
+      "group": "1",
+      "group_title": "General run control",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Regulatory QA unused.)",
+      "api_field": "run.mreg"
+    },
+    {
+      "name": "PMAP",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "UTM assumed; LCC/PS/EM/TTM/LAZA not wired.",
+      "api_field": "grid.pmap"
+    },
+    {
+      "name": "DATUM",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Not used in coord transforms.",
+      "api_field": "grid.datum"
+    },
+    {
+      "name": "FEAST",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Non-UTM false easting unused.)",
+      "api_field": "grid.feast"
+    },
+    {
+      "name": "FNORTH",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "grid.fnorth"
+    },
+    {
+      "name": "IUTMZN",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "UTM zone for lat/lon / header.",
+      "api_field": "grid.iutmzn"
+    },
+    {
+      "name": "UTMHEM",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "UTM hemisphere.",
+      "api_field": "grid.utmhem"
+    },
+    {
+      "name": "RLAT0",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Optional domain lat for solar/Coriolis.",
+      "api_field": "grid.rlat0"
+    },
+    {
+      "name": "RLON0",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Optional domain lon for solar.",
+      "api_field": "grid.rlon0"
+    },
+    {
+      "name": "XLAT1",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (LCC/PS parallel unused.)",
+      "api_field": "grid.xlat1"
+    },
+    {
+      "name": "XLAT2",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "character",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "grid.xlat2"
+    },
+    {
+      "name": "NX",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Taken from GEO.DAT, not INP.",
+      "api_field": "grid.nx"
+    },
+    {
+      "name": "NY",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Taken from GEO.DAT.",
+      "api_field": "grid.ny"
+    },
+    {
+      "name": "DGRIDKM",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Taken from GEO.DAT.",
+      "api_field": "grid.dgridkm"
+    },
+    {
+      "name": "XORIGKM",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Taken from GEO.DAT.",
+      "api_field": "grid.xorigkm"
+    },
+    {
+      "name": "YORIGKM",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Taken from GEO.DAT.",
+      "api_field": "grid.yorigkm"
+    },
+    {
+      "name": "NZ",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Number of layers.",
+      "api_field": "grid.nz"
+    },
+    {
+      "name": "ZFACE",
+      "group": "2",
+      "group_title": "Map projection and grid",
+      "type": "real",
+      "array": "length NZ+1",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Vertical grid faces.",
+      "api_field": "grid.zface"
+    },
+    {
+      "name": "LSAVE",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Caller decides write; flag not read.",
+      "api_field": "output.lsave"
+    },
+    {
+      "name": "LPRINT",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Printer output unused.)",
+      "api_field": "output.lprint"
+    },
+    {
+      "name": "IPRINF",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.iprinf"
+    },
+    {
+      "name": "IUVOUT",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": "length NZ",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Layer UV print unused.)",
+      "api_field": "output.iuvout"
+    },
+    {
+      "name": "IWOUT",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": "length NZ",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.iwout"
+    },
+    {
+      "name": "ITOUT",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": "length NZ",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.itout"
+    },
+    {
+      "name": "STABILITY",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "IPGT computed; print flag unused.",
+      "api_field": "output.stability"
+    },
+    {
+      "name": "USTAR",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Field computed; print flag unused.",
+      "api_field": "output.ustar"
+    },
+    {
+      "name": "MONIN",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "EL computed; print flag unused.",
+      "api_field": "output.monin"
+    },
+    {
+      "name": "MIXHT",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "ZI computed; print flag unused.",
+      "api_field": "output.mixht"
+    },
+    {
+      "name": "WSTAR",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Field computed; print flag unused.",
+      "api_field": "output.wstar"
+    },
+    {
+      "name": "PRECIP",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "RMM zeroed; print/data path unused.",
+      "api_field": "output.precip"
+    },
+    {
+      "name": "SENSHEAT",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "QH internal; output partial.",
+      "api_field": "output.sensheat"
+    },
+    {
+      "name": "CONVZI",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "ziconv for Carson; print flag unused.",
+      "api_field": "output.convzi"
+    },
+    {
+      "name": "LDB",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Debug unused.)",
+      "api_field": "output.ldb"
+    },
+    {
+      "name": "NN1",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.nn1"
+    },
+    {
+      "name": "NN2",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.nn2"
+    },
+    {
+      "name": "LDBCST",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Coast distance output unused.)",
+      "api_field": "output.ldbcst"
+    },
+    {
+      "name": "IOUTD",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ioutd"
+    },
+    {
+      "name": "NZPRN2",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.nzprn2"
+    },
+    {
+      "name": "IPR0",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr0"
+    },
+    {
+      "name": "IPR1",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr1"
+    },
+    {
+      "name": "IPR2",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr2"
+    },
+    {
+      "name": "IPR3",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr3"
+    },
+    {
+      "name": "IPR4",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr4"
+    },
+    {
+      "name": "IPR5",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr5"
+    },
+    {
+      "name": "IPR6",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr6"
+    },
+    {
+      "name": "IPR7",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr7"
+    },
+    {
+      "name": "IPR8",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "output.ipr8"
+    },
+    {
+      "name": "IFORMO",
+      "group": "3",
+      "group_title": "Output options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "CALMET.DAT only (type 1); PACOUT missing.",
+      "api_field": "output.iformo"
+    },
+    {
+      "name": "NOOBS",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Mode inference (noobs / obs / obs_model).",
+      "api_field": "run.noobs"
+    },
+    {
+      "name": "NSSTA",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Assumes 0/1 station; multi-station unused.",
+      "api_field": "met.nssta"
+    },
+    {
+      "name": "NPSTA",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Precipitation stations unused.)",
+      "api_field": "met.npsta"
+    },
+    {
+      "name": "IFORMS",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "SURF format assumed.",
+      "api_field": "met.iforms"
+    },
+    {
+      "name": "IFORMP",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Precip file format unused.)",
+      "api_field": "met.iformp"
+    },
+    {
+      "name": "ICLOUD",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Cloud from SURF sky tenths; schemes 1\u20134 missing.",
+      "api_field": "clouds.icloud"
+    },
+    {
+      "name": "ICLDOUT",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Cloud output flag unused.)",
+      "api_field": "clouds.icldout"
+    },
+    {
+      "name": "MCLOUD",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (INP 2.2 cloud method unused.)",
+      "api_field": "clouds.mcloud"
+    },
+    {
+      "name": "IFORMC",
+      "group": "4",
+      "group_title": "Meteorological data options",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Cloud file format unused.)",
+      "api_field": "met.iformc"
+    },
+    {
+      "name": "IWFCOD",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Diagnostic winds always on; flag not read.",
+      "api_field": "winds.iwfcod"
+    },
+    {
+      "name": "IFRADJ",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Froude blocking on/off (FRADJ).",
+      "api_field": "winds.ifradj"
+    },
+    {
+      "name": "IKINE",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Flag gates stub kinematic+div path; full TOPOF2 W missing.",
+      "api_field": "winds.ikine"
+    },
+    {
+      "name": "IOBR",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Flag gates simplified div-min; full O'Brien missing.",
+      "api_field": "winds.iobr"
+    },
+    {
+      "name": "IEXTRP",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Power-law obs profile; SIMILT helper exists but not wired.",
+      "api_field": "winds.iextrp"
+    },
+    {
+      "name": "RMIN2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.rmin2"
+    },
+    {
+      "name": "FEXTR2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NZ",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Extrapolation factors unused.)",
+      "api_field": "winds.fextr2"
+    },
+    {
+      "name": "IPROG",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Mode inference when >0 with observations.",
+      "api_field": "winds.iprog"
+    },
+    {
+      "name": "ISTEPPG",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy hours; prefer ISTEPPGS.)",
+      "api_field": "winds.isteppg"
+    },
+    {
+      "name": "ISTEPPGS",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "NSECDT drives time; prognostic-step QA missing.",
+      "api_field": "winds.isteppgs"
+    },
+    {
+      "name": "IGFMET",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (IGF as first-guess unused.)",
+      "api_field": "winds.igfmet"
+    },
+    {
+      "name": "LVARY",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Varying radius unused.)",
+      "api_field": "winds.lvary"
+    },
+    {
+      "name": "RMAX1",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (OA distance cutoff unused.)",
+      "api_field": "winds.rmax1"
+    },
+    {
+      "name": "RMAX2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.rmax2"
+    },
+    {
+      "name": "RMAX3",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.rmax3"
+    },
+    {
+      "name": "RMIN",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.rmin"
+    },
+    {
+      "name": "TERRAD",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Terrain radius (km) for FRADJ/slope.",
+      "api_field": "winds.terrad"
+    },
+    {
+      "name": "R1",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Single-station Barnes surface radius; multi-station OA missing.",
+      "api_field": "winds.r1"
+    },
+    {
+      "name": "R2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Aloft OA radius; multi-station incomplete.",
+      "api_field": "winds.r2"
+    },
+    {
+      "name": "RPROG",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Prog weight in OA unused.)",
+      "api_field": "winds.rprog"
+    },
+    {
+      "name": "DIVLIM",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Divergence criterion unused (hardcoded loop).)",
+      "api_field": "winds.divlim"
+    },
+    {
+      "name": "NITER",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Used (capped) in divergence minimization.",
+      "api_field": "winds.niter"
+    },
+    {
+      "name": "NSMTH",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": "length NZ",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Per-layer 5-point smooth passes.",
+      "api_field": "winds.nsmth"
+    },
+    {
+      "name": "NINTR2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": "length NZ",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Max stations per layer unused.)",
+      "api_field": "winds.nintr2"
+    },
+    {
+      "name": "CRITFN",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Critical Froude number.",
+      "api_field": "winds.critfn"
+    },
+    {
+      "name": "ALPHA",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Used in light kinematic/div-min; full IKINE semantics incomplete.",
+      "api_field": "winds.alpha"
+    },
+    {
+      "name": "NBAR",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Wind barriers unused.)",
+      "api_field": "winds.nbar"
+    },
+    {
+      "name": "XBBAR",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBAR",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "api_field": "winds.xbbar"
+    },
+    {
+      "name": "YBBAR",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBAR",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "api_field": "winds.ybbar"
+    },
+    {
+      "name": "XEBAR",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBAR",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "api_field": "winds.xebar"
+    },
+    {
+      "name": "YEBAR",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBAR",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "api_field": "winds.yebar"
+    },
+    {
+      "name": "KBAR",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier top level unused.)",
+      "api_field": "winds.kbar"
+    },
+    {
+      "name": "IDIOPT1",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Diag option switches unused.)",
+      "api_field": "winds.idiopt1"
+    },
+    {
+      "name": "IDIOPT2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.idiopt2"
+    },
+    {
+      "name": "IDIOPT3",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.idiopt3"
+    },
+    {
+      "name": "IDIOPT4",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.idiopt4"
+    },
+    {
+      "name": "IDIOPT5",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.idiopt5"
+    },
+    {
+      "name": "ISURFT",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Surface T station index unused.)",
+      "api_field": "winds.isurft"
+    },
+    {
+      "name": "IUPT",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Upper T index unused.)",
+      "api_field": "winds.iupt"
+    },
+    {
+      "name": "ZUPT",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.zupt"
+    },
+    {
+      "name": "IUPWND",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Upper wind index unused.)",
+      "api_field": "winds.iupwnd"
+    },
+    {
+      "name": "ZUPWND",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length 2",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.zupwnd"
+    },
+    {
+      "name": "LLBREZE",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "logical",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Lake-breeze unused.)",
+      "api_field": "winds.llbreze"
+    },
+    {
+      "name": "NBOX",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Lake-breeze boxes unused.)",
+      "api_field": "winds.nbox"
+    },
+    {
+      "name": "XG1",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.xg1"
+    },
+    {
+      "name": "XG2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.xg2"
+    },
+    {
+      "name": "YG1",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.yg1"
+    },
+    {
+      "name": "YG2",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.yg2"
+    },
+    {
+      "name": "XBCST",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Coastline box unused.)",
+      "api_field": "winds.xbcst"
+    },
+    {
+      "name": "YBCST",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.ybcst"
+    },
+    {
+      "name": "XECST",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.xecst"
+    },
+    {
+      "name": "YECST",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NBOX",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.yecst"
+    },
+    {
+      "name": "NLB",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.nlb"
+    },
+    {
+      "name": "METBXID",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": "length mxbxwnd",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "winds.metbxid"
+    },
+    {
+      "name": "BIAS",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "real",
+      "array": "length NZ",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Not applied to layer blending.",
+      "api_field": "winds.bias"
+    },
+    {
+      "name": "ISLOPE",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Slope flow on/off (Mahrt).",
+      "api_field": "winds.islope"
+    },
+    {
+      "name": "ICALM",
+      "group": "5",
+      "group_title": "Wind field options and parameters",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Calm processing unused.)",
+      "api_field": "winds.icalm"
+    },
+    {
+      "name": "CONSTB",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Carson buoyancy constant.",
+      "api_field": "pbl.constb"
+    },
+    {
+      "name": "CONSTE",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Energy-budget path partial; CONSTE unused.",
+      "api_field": "pbl.conste"
+    },
+    {
+      "name": "CONSTN",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Night Zi constant.",
+      "api_field": "pbl.constn"
+    },
+    {
+      "name": "DPTMIN",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Constant Carson gamma; MIXDT sounding lapse deferred.",
+      "api_field": "pbl.dptmin"
+    },
+    {
+      "name": "DZZI",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Inversions thickness unused.)",
+      "api_field": "pbl.dzzi"
+    },
+    {
+      "name": "ZIMIN",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Min mixing height.",
+      "api_field": "pbl.zimin"
+    },
+    {
+      "name": "ZIMAX",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Max mixing height.",
+      "api_field": "pbl.zimax"
+    },
+    {
+      "name": "ZIMINW",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater Zi min unused.)",
+      "api_field": "pbl.ziminw"
+    },
+    {
+      "name": "ZIMAXW",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater Zi max unused.)",
+      "api_field": "pbl.zimaxw"
+    },
+    {
+      "name": "IAVEZI",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Zi averaging unused.)",
+      "api_field": "pbl.iavezi"
+    },
+    {
+      "name": "MNMDAV",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "pbl.mnmdav"
+    },
+    {
+      "name": "HAFANG",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "pbl.hafang"
+    },
+    {
+      "name": "ILEVZI",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "pbl.ilevzi"
+    },
+    {
+      "name": "FCORIOL",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Coriolis from lat; FCORIOL INP ignored.",
+      "api_field": "pbl.fcoriol"
+    },
+    {
+      "name": "CONSTW",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater mixing unused.)",
+      "api_field": "pbl.constw"
+    },
+    {
+      "name": "ITPROG",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "3D T2 used in noobs; full ITPROG paths missing.",
+      "api_field": "temp.itprog"
+    },
+    {
+      "name": "ITWPROG",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Water T from prog unused.)",
+      "api_field": "pbl.itwprog"
+    },
+    {
+      "name": "ILUOC3D",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (3D landuse overlay unused.)",
+      "api_field": "pbl.iluoc3d"
+    },
+    {
+      "name": "IRAD",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Solar always computed; IRAD option not read.",
+      "api_field": "radiation.irad"
+    },
+    {
+      "name": "IAVET",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (T averaging unused.)",
+      "api_field": "pbl.iavet"
+    },
+    {
+      "name": "TGDEFB",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Default lapse (below) unused.)",
+      "api_field": "pbl.tgdefb"
+    },
+    {
+      "name": "TGDEFA",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Default lapse (above) unused.)",
+      "api_field": "pbl.tgdefa"
+    },
+    {
+      "name": "JWAT1",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": "length mxwb",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "INP JWAT1/JWAT2 bound; effective_iwat() aliases IWAT for heatfx/slope (999\u2192GEO 55).",
+      "api_field": "pbl.jwat1"
+    },
+    {
+      "name": "JWAT2",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": "length mxwb",
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Paired with JWAT1; see JWAT1.",
+      "api_field": "pbl.jwat2"
+    },
+    {
+      "name": "TRADKM",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Temperature OA radius unused.)",
+      "api_field": "pbl.tradkm"
+    },
+    {
+      "name": "NUMTS",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "pbl.numts"
+    },
+    {
+      "name": "NFLAGP",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Precip QC unused.)",
+      "api_field": "pbl.nflagp"
+    },
+    {
+      "name": "SIGMAP",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Precip sigma unused.)",
+      "api_field": "pbl.sigmap"
+    },
+    {
+      "name": "CUTP",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Precip cutoff unused.)",
+      "api_field": "pbl.cutp"
+    },
+    {
+      "name": "HA1",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Bound into shortwave_radiation from CalmetConfig.",
+      "api_field": "radiation.ha1"
+    },
+    {
+      "name": "HA2",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Bound into shortwave_radiation from CalmetConfig.",
+      "api_field": "radiation.ha2"
+    },
+    {
+      "name": "HB1",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Bound into shortwave_radiation from CalmetConfig.",
+      "api_field": "radiation.hb1"
+    },
+    {
+      "name": "HB2",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Bound into shortwave_radiation from CalmetConfig.",
+      "api_field": "radiation.hb2"
+    },
+    {
+      "name": "HC1",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Bound into heat_flux_energy_budget from CalmetConfig.",
+      "api_field": "radiation.hc1"
+    },
+    {
+      "name": "HC2",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Bound into heat_flux_energy_budget from CalmetConfig.",
+      "api_field": "radiation.hc2"
+    },
+    {
+      "name": "HC3",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Implemented",
+      "notes": "Bound into heat_flux_energy_budget from CalmetConfig.",
+      "api_field": "radiation.hc3"
+    },
+    {
+      "name": "IMIXH",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Maul\u2013Carson day + night mechanical only; other IMIXH options missing.",
+      "api_field": "pbl.imixh"
+    },
+    {
+      "name": "THRESHL",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Implemented",
+      "notes": "Daytime MIXHMC growth threshold.",
+      "api_field": "pbl.threshl"
+    },
+    {
+      "name": "THRESHW",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Overwater threshold unused.)",
+      "api_field": "pbl.threshw"
+    },
+    {
+      "name": "ICOARE",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (No COARE overwater flux module (PSIUD helper only).)",
+      "api_field": "overwater.icoare"
+    },
+    {
+      "name": "DSHELF",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (COARE coastal shelf unused.)",
+      "api_field": "overwater.dshelf"
+    },
+    {
+      "name": "IWARM",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (COARE warm-layer unused.)",
+      "api_field": "overwater.iwarm"
+    },
+    {
+      "name": "ICOOL",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (COARE cool-skin unused.)",
+      "api_field": "overwater.icool"
+    },
+    {
+      "name": "IRHPROG",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "RH from 3D/SURF; flag not read.",
+      "api_field": "humidity.irhprog"
+    },
+    {
+      "name": "IZICRLX",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "integer",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Zi relaxation unused.)",
+      "api_field": "pbl.izicrlx"
+    },
+    {
+      "name": "TZICRLX",
+      "group": "6",
+      "group_title": "Mixing height, temperature, precip, overwater",
+      "type": "real",
+      "array": null,
+      "sources": [
+        "READCF"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "api_field": "pbl.tzicrlx"
+    },
+    {
+      "name": "SS1",
+      "group": "station",
+      "group_title": "Station location free-format records (IG 7\u20139)",
+      "type": "station_record",
+      "array": "SSn surface station records",
+      "sources": [
+        "READCF_station_freeform",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "Single-station X/Y for OA; multi-station SSn unused.",
+      "api_field": "stations.surface[0]"
+    },
+    {
+      "name": "US1",
+      "group": "station",
+      "group_title": "Station location free-format records (IG 7\u20139)",
+      "type": "station_record",
+      "array": "USn upper-air station records",
+      "sources": [
+        "READCF_station_freeform",
+        "sample_inp"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": true,
+      "status": "Partial",
+      "notes": "UP.DAT sounding used; US1 coords unused.",
+      "api_field": "stations.upper[0]"
+    },
+    {
+      "name": "PS1",
+      "group": "station",
+      "group_title": "Station location free-format records (IG 7\u20139)",
+      "type": "station_record",
+      "array": "PSn precip station records",
+      "sources": [
+        "READCF_station_freeform"
+      ],
+      "in_readcf_or_readfn": true,
+      "in_sample_inp": false,
+      "status": "Partial",
+      "notes": "Accepted on CalmetConfig; physics TBD. (Precip station records unused.)",
+      "api_field": "stations.precip[0]"
+    }
+  ]
+}

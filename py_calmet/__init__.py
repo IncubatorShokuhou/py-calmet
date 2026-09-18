@@ -3,6 +3,8 @@
 __version__ = "1.0.0"
 
 from .core.runner import run_calmet, CalmetResult
+from .config import CalmetConfig, PARAM_NAMES
+from .io.inp import read_inp, write_inp
 from .io.calmet_dat import read_calmet_dat, write_calmet_dat, write_calmet_netcdf, CalmetDataset
 
 __all__ = [

@@ -247,10 +247,15 @@ def sine_solar_elevation(
 def shortwave_radiation(
     sinalp: np.ndarray,
     ccfrac: float | np.ndarray = 0.0,
+    *,
+    ha1: float = HA1,
+    ha2: float = HA2,
+    hb1: float = HB1,
+    hb2: float = HB2,
 ) -> np.ndarray:
     """QSW (W/m^2) from sine solar elevation and cloud fraction."""
     cc = np.asarray(ccfrac, dtype=np.float64)
-    qsw = (HA1 * np.asarray(sinalp, dtype=np.float64) + HA2) * (1.0 + HB1 * cc ** HB2)
+    qsw = (ha1 * np.asarray(sinalp, dtype=np.float64) + ha2) * (1.0 + hb1 * cc ** hb2)
     return np.maximum(qsw, 0.0)
 
 
@@ -266,6 +271,10 @@ def heat_flux_energy_budget(
     landuse: np.ndarray | None = None,
     iwat1: int = 55,
     iwat2: int = 55,
+    *,
+    hc1: float = HC1,
+    hc2: float = HC2,
+    hc3: float = HC3,
 ) -> np.ndarray:
     """Daytime sensible heat flux (Holtslag–van Ulden); night → -0.1 over land."""
     qsw = np.asarray(qsw, dtype=np.float64)
@@ -285,10 +294,10 @@ def heat_flux_energy_budget(
     if np.any(day):
         qstar = (
             (1.0 - alb) * qsw
-            + HC1 * tempk ** 6
+            + hc1 * tempk ** 6
             - 5.67e-8 * tempk ** 4
-            + HC2 * cc
-        ) / (HC3 + 1.0)
+            + hc2 * cc
+        ) / (hc3 + 1.0)
         qh_day = bo * (qstar * (1.0 - hg) + qa) / (1.0 + bo)
         qh = np.where(day, qh_day, qh)
     return qh

@@ -5,7 +5,7 @@ from .geo import read_geo
 from .surf import read_surf
 from .up import read_up
 from .threed import read_3d
-from .inp import read_inp
+from .inp import read_inp, write_inp, CalmetInp
 
 __all__ = [
     "CalmetDataset",
@@ -17,4 +17,6 @@ __all__ = [
     "read_up",
     "read_3d",
     "read_inp",
+    "write_inp",
+    "CalmetInp",
 ]
