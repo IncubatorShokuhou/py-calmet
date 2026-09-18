@@ -1,6 +1,6 @@
 [project]
 name = "py-calmet"
-version = "0.0.1"
+version = "0.1.0"
 description = "Pure-NumPy CALMET-style diagnostic meteorological downscaling"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "netCDF4>=1.6", "xarray>=2023.1"]
+dev = ["pytest>=7.0", "netCDF4>=1.6", "xarray>=2023.1", "pyproj>=3.5"]
 
 [build-system]
 requires = ["setuptools>=68"]

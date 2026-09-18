@@ -1,0 +1,13 @@
+SURF.DAT        2.1             Hour Start and End Times with Seconds
+   1
+Synthetic SURF from wrfout near-surface (center); hourly interp; not real obs
+NONE
+UTC+0000
+ 2005  240   0     0  2005  240   3     0    1
+   88801
+2005  240   0    0  2005  240   1    0
+   2.287   63.341   50    4  303.669   95  978.222    0
+2005  240   1    0  2005  240   2    0
+   1.398  106.874   50    4  302.145   95  978.242    0
+2005  240   2    0  2005  240   3    0
+   1.944  161.022   50    4  300.621   95  978.262    0

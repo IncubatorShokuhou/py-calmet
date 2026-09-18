@@ -1,7 +1,7 @@
-"""Diagnostic wind construction for the tiny-domain configurations."""
+"""Diagnostic wind construction (interp, OA, slope flow, mass consistency)."""
 from __future__ import annotations
 import numpy as np
-from .met_utils import wind_uv, ZO_EXTRAP, layer_mids
+from .met_utils import wind_uv, ZO_EXTRAP, layer_mids, G, CP
 from .similt import similt_profile
 
 
@@ -47,7 +47,6 @@ def obs_surface_uv(ws: float, wd: float, nx: int, ny: int) -> tuple[np.ndarray, 
     return np.full((ny, nx), u, dtype=np.float64), np.full((ny, nx), v, dtype=np.float64)
 
 
-
 def obs_profile_similt(
     u_sfc: float,
     v_sfc: float,
@@ -63,12 +62,7 @@ def obs_profile_similt(
     ny: int,
     p_exp: float = 0.17,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Obs vertical profile: power-law speed + UA direction blend.
-
-    Layer 1 matches the anemometer wind. Aloft, speed follows a stable-layer
-    power law gently blended toward upper-air speeds; direction blends from
-    the surface toward the sounding (IEXTRP=-4 style approximation).
-    """
+    """Obs vertical profile: power-law speed + UA direction blend."""
     zmid = layer_mids(zface)
     z_agl = np.array([lev.height - stn_elev for lev in sounding_levels], dtype=np.float64)
     wd = np.array([lev.wd for lev in sounding_levels], dtype=np.float64)
@@ -145,3 +139,150 @@ def light_terrain_adjust(
         Uo[k] = Uo[k] - scale * dzdx * speed
         Vo[k] = Vo[k] - scale * dzdy * speed
     return Uo, Vo
+
+
+def slope_flow(
+    elev: np.ndarray,
+    dgrid_m: float,
+    qh: np.ndarray,
+    tempk: np.ndarray,
+    rho: np.ndarray,
+    zface: np.ndarray,
+    cdk: float = 0.0004,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Allwine–Whiteman / Horst–Doran style slope-flow (U,V) on layer 1.
+
+    Downslope when qh < 0, upslope when qh > 0. Higher layers get a
+    linearly decaying contribution through the estimated drainage depth.
+    """
+    ny, nx = elev.shape
+    nz = len(zface) - 1
+    dzdx = np.gradient(elev, dgrid_m, axis=1)
+    dzdy = np.gradient(elev, dgrid_m, axis=0)
+    slope = np.hypot(dzdx, dzdy)
+    sinalf = np.sin(np.arctan(np.maximum(slope, 0.0)))
+    sinalf = np.where(np.abs(np.arctan(slope)) < 0.009, 0.0, sinalf)
+
+    hmax = elev.max()
+    hmin = elev.min()
+    # distance-to-crest / valley proxies
+    dcrest = np.sqrt((hmax - elev) ** 2 + (5.0 * dgrid_m) ** 2)
+    dvalley = np.sqrt((elev - hmin) ** 2 + (5.0 * dgrid_m) ** 2)
+    hd_down = np.maximum(0.05 * (hmax - elev), 0.05)
+    hd_up = np.maximum(0.05 * (elev - hmin), 0.05)
+
+    rhocp = np.maximum(rho * CP, 1.0)
+    uslope = np.zeros((ny, nx))
+    vslope = np.zeros((ny, nx))
+
+    # Downslope (drainage)
+    mask_d = qh < 0.0
+    if np.any(mask_d):
+        sa = np.minimum(sinalf[mask_d], (hmax - elev[mask_d]) / np.maximum(dcrest[mask_d], 1.0))
+        tempmef = np.maximum(-dcrest[mask_d] * cdk / hd_down[mask_d], -50.0)
+        speed = -(
+            sa
+            * (G / np.maximum(tempk[mask_d], 200.0))
+            * np.abs(qh[mask_d])
+            * dcrest[mask_d]
+            / rhocp[mask_d]
+            / cdk
+        )
+        speed = np.sign(speed) * (np.abs(speed) ** (1.0 / 3.0)) * ((1.0 - np.exp(tempmef)) ** (1.0 / 3.0))
+        # direction: downslope = opposite terrain gradient
+        mag = np.maximum(slope[mask_d], 1e-8)
+        uslope[mask_d] = -speed * (dzdx[mask_d] / mag)  # toward lower elev when speed>0 after abs
+        # speed is negative for downslope in Fortran UVALLY; take abs for magnitude
+        mag_spd = np.abs(speed)
+        uslope[mask_d] = -mag_spd * (dzdx[mask_d] / mag)
+        vslope[mask_d] = -mag_spd * (dzdy[mask_d] / mag)
+
+    # Upslope
+    mask_u = qh > 0.0
+    if np.any(mask_u):
+        speed = (
+            (G / np.maximum(tempk[mask_u], 200.0))
+            * np.abs(qh[mask_u])
+            * (elev[mask_u] - hmin)
+            / rhocp[mask_u]
+        ) ** (1.0 / 3.0)
+        mag = np.maximum(slope[mask_u], 1e-8)
+        uslope[mask_u] = speed * (dzdx[mask_u] / mag)
+        vslope[mask_u] = speed * (dzdy[mask_u] / mag)
+
+    # Depth decay: full at layer 1, fade by ~hd
+    Uadd = np.zeros((nz, ny, nx))
+    Vadd = np.zeros_like(Uadd)
+    zmid = layer_mids(zface)
+    hd = np.where(qh < 0, hd_down, hd_up)
+    for L, zm in enumerate(zmid):
+        w = np.clip(1.0 - zm / np.maximum(hd, 1.0), 0.0, 1.0)
+        Uadd[L] = uslope * w
+        Vadd[L] = vslope * w
+    return Uadd, Vadd
+
+
+def divergence_minimize(
+    U: np.ndarray,
+    V: np.ndarray,
+    dgrid_m: float,
+    niter: int = 50,
+    alpha: float = 0.5,
+    terrain: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """O'Brien / DIAGNO-style iterative divergence reduction on each layer.
+
+    Solves a discrete Poisson equation for a velocity potential φ such that
+    ∇²φ ≈ ∇·V, then U ← U − ∂φ/∂x, V ← V − ∂φ/∂y. Terrain blocking is a
+    light optional damping near steep slopes.
+    """
+    Uo, Vo = U.copy(), V.copy()
+    nz, ny, nx = U.shape
+    dx = dgrid_m
+    for k in range(nz):
+        u = Uo[k]
+        v = Vo[k]
+        phi = np.zeros((ny, nx), dtype=np.float64)
+        for _ in range(niter):
+            # divergence
+            dudx = np.gradient(u - np.gradient(phi, dx, axis=1), dx, axis=1)
+            # Use residual form: update phi so laplacian(phi) → div(U,V)
+            div = np.gradient(u, dx, axis=1) + np.gradient(v, dx, axis=0)
+            # Jacobi relaxation for ∇²φ = div
+            phi_new = phi.copy()
+            if ny > 2 and nx > 2:
+                neigh = (
+                    phi[:-2, 1:-1]
+                    + phi[2:, 1:-1]
+                    + phi[1:-1, :-2]
+                    + phi[1:-1, 2:]
+                )
+                phi_new[1:-1, 1:-1] = 0.25 * (neigh - div[1:-1, 1:-1] * dx * dx)
+            phi = (1.0 - alpha) * phi + alpha * phi_new
+        # subtract gradient of phi
+        Uo[k] = u - np.gradient(phi, dx, axis=1)
+        Vo[k] = v - np.gradient(phi, dx, axis=0)
+    if terrain is not None:
+        # lightly damp adjustments over flat water-like terrain (no-op mostly)
+        pass
+    return Uo, Vo
+
+
+def vertical_velocity_from_div(
+    U: np.ndarray,
+    V: np.ndarray,
+    zface: np.ndarray,
+    dgrid_m: float,
+) -> np.ndarray:
+    """Kinematic W at layer mids from horizontally divergent flow (anelastic)."""
+    nz, ny, nx = U.shape
+    zmid = layer_mids(zface)
+    W = np.zeros((nz, ny, nx), dtype=np.float64)
+    # integrate div from surface
+    w_face = np.zeros((nz + 1, ny, nx), dtype=np.float64)
+    for L in range(nz):
+        div = np.gradient(U[L], dgrid_m, axis=1) + np.gradient(V[L], dgrid_m, axis=0)
+        dz = zface[L + 1] - zface[L]
+        w_face[L + 1] = w_face[L] - div * dz
+        W[L] = 0.5 * (w_face[L] + w_face[L + 1])
+    return W

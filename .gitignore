@@ -12,3 +12,12 @@ vendor/
 *.x
 *.o
 .DS_Store
+
+# Large / regenerated WRF inputs (cite URL in cases/wrf_demo/README.md)
+cases/wrf_demo/raw/
+cases/wrf_demo/work/
+
+# Local Fortran run scratch (goldens/ is archived intentionally)
+cases/wrf_demo/obs/
+cases/wrf_demo/obs_model/
+cases/wrf_demo/noobs/

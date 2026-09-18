@@ -527,3 +527,282 @@ if __name__ == "__main__":
 def read_calmet_dat(path):
     """Read a CALMET.DAT file into a CalmetDataset."""
     return CalmetDataset.read(path)
+
+
+# ---------------------------------------------------------------------------
+# Writer
+# ---------------------------------------------------------------------------
+
+class FortranSequentialWriter:
+    """Write unformatted Fortran sequential records (4-byte markers)."""
+
+    def __init__(self, path: str | Path, endian: str = "<"):
+        self.path = Path(path)
+        self.endian = endian
+        self.handle: Optional[BinaryIO] = None
+
+    def __enter__(self) -> "FortranSequentialWriter":
+        self.handle = self.path.open("wb")
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self.handle is not None:
+            self.handle.close()
+            self.handle = None
+
+    def write_record(self, payload: bytes) -> None:
+        assert self.handle is not None
+        n = len(payload)
+        marker = struct.pack(f"{self.endian}i", n)
+        self.handle.write(marker + payload + marker)
+
+
+def _pack_string(s: str, width: int) -> bytes:
+    b = s.encode("ascii", errors="replace")[:width]
+    return b + b" " * (width - len(b))
+
+
+def _yyyyjjjhh(dt: datetime) -> tuple[int, int]:
+    jday = int(dt.timetuple().tm_yday)
+    code = dt.year * 100_000 + jday * 100 + dt.hour
+    return code, dt.minute * 60 + dt.second
+
+
+def _pack_run_control(rc: RunControl) -> bytes:
+    endian = "<"
+    parts = []
+    st, et = rc.start_time, rc.end_time
+    parts.append(
+        struct.pack(
+            f"{endian}10i",
+            st.year, st.month, st.day, st.hour, st.minute * 60 + st.second,
+            et.year, et.month, et.day, et.hour, et.minute * 60 + et.second,
+        )
+    )
+    parts.append(_pack_string(rc.timezone, 8))
+    parts.append(struct.pack(f"{endian}2i", rc.irlg, rc.irtype))
+    parts.append(struct.pack(f"{endian}3i", rc.nx, rc.ny, rc.nz))
+    parts.append(struct.pack(f"{endian}3f", rc.dgrid, rc.xorigr, rc.yorigr))
+    parts.append(
+        struct.pack(
+            f"{endian}8i",
+            rc.iwfcod, rc.nssta, rc.nusta, rc.npsta, rc.nowsta, rc.nlu, rc.iwat1, rc.iwat2,
+        )
+    )
+    parts.append(struct.pack(f"{endian}i", 1 if rc.lcalgrd else 0))
+    parts.append(_pack_string(rc.pmap, 8))
+    parts.append(_pack_string(rc.datum, 8))
+    parts.append(_pack_string(rc.daten, 12))
+    parts.append(struct.pack(f"{endian}2f", rc.feast, rc.fnorth))
+    parts.append(_pack_string(rc.utmhem, 4))
+    parts.append(struct.pack(f"{endian}i", rc.iutmzn))
+    parts.append(struct.pack(f"{endian}4f", rc.rnlat0, rc.relon0, rc.xlat1, rc.xlat2))
+    return b"".join(parts)
+
+
+def _pack_labeled(
+    label: str,
+    payload: bytes,
+    time_info: tuple[int, int, int, int] = (0, 0, 0, 0),
+    endian: str = "<",
+) -> bytes:
+    return _pack_string(label, 8) + struct.pack(f"{endian}4i", *time_info) + payload
+
+
+def _pack_grid(arr: np.ndarray, dtype_name: str, endian: str = "<") -> bytes:
+    """Pack [ny, nx] array in Fortran order (i fastest).
+
+    Reader does: frombuffer → reshape((nx, ny), order='F').T → [ny, nx],
+    so we must emit values with index i + j*nx = arr[j, i], i.e. C-ravel of [ny, nx].
+    """
+    a = np.asarray(arr)
+    if a.ndim != 2:
+        raise ValueError(f"Expected 2D grid, got {a.shape}")
+    dt = np.dtype(f"{endian}f4" if dtype_name == "real" else f"{endian}i4")
+    flat = np.asarray(a, dtype=dt).ravel(order="C")
+    return flat.tobytes()
+
+
+def write_calmet_dat(
+    path: str | Path,
+    *,
+    result: "object",
+    run_control: RunControl,
+    z0: np.ndarray,
+    landuse: np.ndarray,
+    elev: np.ndarray,
+    xlai: np.ndarray | None = None,
+    xssta: np.ndarray | None = None,
+    yssta: np.ndarray | None = None,
+    xusta: np.ndarray | None = None,
+    yusta: np.ndarray | None = None,
+    nears: np.ndarray | None = None,
+    comments: List[str] | None = None,
+    rmm: np.ndarray | None = None,
+) -> None:
+    """Write a CALMET.DAT file readable by :class:`CalmetDataset`.
+
+    ``result`` must expose U,V,W,T [nt,nz,ny,nx] and 2D fields
+    IPGT,USTAR,ZI,EL,WSTAR,TEMPK,RHO,QSW,IRH [nt,ny,nx], plus zface.
+    """
+    path = Path(path)
+    endian = "<"
+    nx, ny, nz = run_control.nx, run_control.ny, run_control.nz
+    nt = int(result.U.shape[0])
+    if xlai is None:
+        xlai = np.ones((ny, nx), dtype=np.float32)
+    if comments is None:
+        comments = [
+            "Produced by py-calmet write_calmet_dat",
+            f"mode={getattr(result, 'mode', 'unknown')}",
+        ]
+
+    with FortranSequentialWriter(path, endian=endian) as w:
+        w.write_record(
+            _pack_string("CALMET.DAT", 16)
+            + _pack_string("2.1", 16)
+            + _pack_string("No-Obs file structure with embedded control file", 64)
+        )
+        w.write_record(struct.pack(f"{endian}i", len(comments)))
+        for c in comments:
+            w.write_record(_pack_string(c, max(len(c), 1)))
+        w.write_record(_pack_run_control(run_control))
+
+        # static
+        zface = np.asarray(result.zface, dtype=np.float32)
+        w.write_record(
+            _pack_labeled("ZFACE", np.asarray(zface, dtype=f"{endian}f4").tobytes())
+        )
+        if run_control.nssta >= 1:
+            xs = np.asarray(xssta if xssta is not None else [0.0], dtype=np.float32)
+            ys = np.asarray(yssta if yssta is not None else [0.0], dtype=np.float32)
+            w.write_record(_pack_labeled("XSSTA", np.asarray(xs, dtype=f"{endian}f4").tobytes()))
+            w.write_record(_pack_labeled("YSSTA", np.asarray(ys, dtype=f"{endian}f4").tobytes()))
+        if run_control.nusta >= 1:
+            xu = np.asarray(xusta if xusta is not None else [0.0], dtype=np.float32)
+            yu = np.asarray(yusta if yusta is not None else [0.0], dtype=np.float32)
+            w.write_record(_pack_labeled("XUSTA", np.asarray(xu, dtype=f"{endian}f4").tobytes()))
+            w.write_record(_pack_labeled("YUSTA", np.asarray(yu, dtype=f"{endian}f4").tobytes()))
+
+        for label, arr, kind in (
+            ("Z0", z0, "real"),
+            ("ILANDU", landuse, "int"),
+            ("ELEV", elev, "real"),
+            ("XLAI", xlai, "real"),
+        ):
+            w.write_record(_pack_labeled(label, _pack_grid(arr, kind, endian)))
+        if run_control.nssta >= 1:
+            near = nears if nears is not None else np.ones((ny, nx), dtype=np.int32)
+            w.write_record(_pack_labeled("NEARS", _pack_grid(near, "int", endian)))
+
+        # timesteps
+        dt = timedelta(seconds=3600)  # default; override via time_bounds if present
+        start = run_control.start_time
+        # Prefer evenly spaced from start using irlg
+        step_sec = int((run_control.end_time - run_control.start_time).total_seconds() // max(nt, 1))
+        if step_sec <= 0:
+            step_sec = 3600
+
+        for t in range(nt):
+            t0 = start + timedelta(seconds=t * step_sec)
+            t1 = t0 + timedelta(seconds=step_sec)
+            c0, s0 = _yyyyjjjhh(t0)
+            c1, s1 = _yyyyjjjhh(t1)
+            tinfo = (c0, s0, c1, s1)
+
+            for lev in range(1, nz + 1):
+                w.write_record(
+                    _pack_labeled(
+                        f"U-LEV{lev:3d}",
+                        _pack_grid(result.U[t, lev - 1], "real", endian),
+                        tinfo,
+                        endian,
+                    )
+                )
+                w.write_record(
+                    _pack_labeled(
+                        f"V-LEV{lev:3d}",
+                        _pack_grid(result.V[t, lev - 1], "real", endian),
+                        tinfo,
+                        endian,
+                    )
+                )
+                if run_control.lcalgrd:
+                    w.write_record(
+                        _pack_labeled(
+                            f"WFACE{lev:3d}",
+                            _pack_grid(result.W[t, lev - 1], "real", endian),
+                            tinfo,
+                            endian,
+                        )
+                    )
+            if run_control.irtype != 0 and run_control.lcalgrd:
+                for lev in range(1, nz + 1):
+                    w.write_record(
+                        _pack_labeled(
+                            f"T-LEV{lev:3d}",
+                            _pack_grid(result.T[t, lev - 1], "real", endian),
+                            tinfo,
+                            endian,
+                        )
+                    )
+            if run_control.irtype != 0:
+                for label, arr, kind in (
+                    ("IPGT", result.IPGT[t], "int"),
+                    ("USTAR", result.USTAR[t], "real"),
+                    ("ZI", result.ZI[t], "real"),
+                    ("EL", result.EL[t], "real"),
+                    ("WSTAR", result.WSTAR[t], "real"),
+                ):
+                    w.write_record(
+                        _pack_labeled(label, _pack_grid(arr, kind, endian), tinfo, endian)
+                    )
+                if run_control.npsta != 0:
+                    rr = rmm[t] if rmm is not None else np.zeros((ny, nx), dtype=np.float32)
+                    w.write_record(
+                        _pack_labeled("RMM", _pack_grid(rr, "real", endian), tinfo, endian)
+                    )
+                for label, arr, kind in (
+                    ("TEMPK", result.TEMPK[t], "real"),
+                    ("RHO", result.RHO[t], "real"),
+                    ("QSW", result.QSW[t], "real"),
+                    ("IRH", result.IRH[t], "int"),
+                ):
+                    w.write_record(
+                        _pack_labeled(label, _pack_grid(arr, kind, endian), tinfo, endian)
+                    )
+                if run_control.npsta != 0:
+                    w.write_record(
+                        _pack_labeled(
+                            "IPCODE",
+                            _pack_grid(np.zeros((ny, nx), dtype=np.int32), "int", endian),
+                            tinfo,
+                            endian,
+                        )
+                    )
+
+
+def write_calmet_netcdf(path: str | Path, result: "object", run_control: RunControl | None = None) -> None:
+    """Write a CF-ish NetCDF of CalmetResult fields (optional dependency)."""
+    try:
+        from netCDF4 import Dataset
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError("netCDF4 required for write_calmet_netcdf") from exc
+
+    path = Path(path)
+    nt, nz, ny, nx = result.U.shape
+    with Dataset(path, "w") as ds:
+        ds.createDimension("time", nt)
+        ds.createDimension("level", nz)
+        ds.createDimension("y", ny)
+        ds.createDimension("x", nx)
+        ds.createDimension("zface", nz + 1)
+        ds.createVariable("zface", "f4", ("zface",))[:] = np.asarray(result.zface, dtype=np.float32)
+        for name in ("U", "V", "W", "T"):
+            var = ds.createVariable(name, "f4", ("time", "level", "y", "x"))
+            var[:] = np.asarray(getattr(result, name), dtype=np.float32)
+        for name in ("IPGT", "USTAR", "ZI", "EL", "WSTAR", "TEMPK", "RHO", "QSW", "IRH"):
+            var = ds.createVariable(name, "f4", ("time", "y", "x"))
+            var[:] = np.asarray(getattr(result, name), dtype=np.float32)
+        ds.setncattr("title", "py-calmet output")
+        ds.setncattr("mode", getattr(result, "mode", ""))

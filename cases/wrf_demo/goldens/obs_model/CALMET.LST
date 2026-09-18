@@ -1,0 +1,965 @@
+                                        CALMET   Version: 6.5.0          Level: 150223  
+ **********************************************************************************************************************************
+
+
+
+  Clock time: 00:15:31
+        Date: 09-18-2026
+
+
+ Internal Coordinate Transformations by  ---  COORDLIB   Version: 1.10.0   Level: 140313  
+
+
+
+  Run Title:
+     wrf_demo mode=obs_model                                                         
+     12x12 @28.009km UTM14N NCAR Katrina wrfout hourly                               
+     ---------------- Run title (3 lines) ------------------------------------------ 
+
+                                                                                                                                                                                                         
+                                                                                                                                                                                                         
+ -------------------------------------------------------------------------------                                                                                                                         
+                                                                                                                                                                                                         
+ INPUT GROUP: 1 -- General run control parameters                                                                                                                                                        
+ --------------                                                                                                                                                                                          
+                                                                                                                                                                                                         
+      Starting date:    Year   (IBYR)  --    No default   ! IBYR  =  2005  !                                                                                                                             
+                        Month  (IBMO)  --    No default   ! IBMO  =  8  !                                                                                                                                
+                        Day    (IBDY)  --    No default   ! IBDY  =  28  !                                                                                                                               
+      Starting time:    Hour   (IBHR)  --    No default   ! IBHR  =  0  !                                                                                                                                
+                        Second (IBSEC) --    No default   ! IBSEC =  0  !                                                                                                                                
+                                                                                                                                                                                                         
+      Ending date:      Year   (IEYR)  --    No default   ! IEYR  =  2005  !                                                                                                                             
+                        Month  (IEMO)  --    No default   ! IEMO  =  8  !                                                                                                                                
+                        Day    (IEDY)  --    No default   ! IEDY  =  28  !                                                                                                                               
+      Ending time:      Hour   (IEHR)  --    No default   ! IEHR  =  3  !                                                                                                                                
+                        Second (IESEC) --    No default   ! IESEC =  0  !                                                                                                                                
+                                                                                                                                                                                                         
+       UTC time zone         (ABTZ) -- No default       ! ABTZ= UTC+0000 !                                                                                                                               
+          (character*8)                                                                                                                                                                                  
+                                                                                                                                                                                                         
+      Length of modeling time-step (seconds)                                                                                                                                                             
+      (NSECDT)                        Default:3600     ! NSECDT =  3600  !                                                                                                                               
+                                                                                                                                                                                                         
+      Run type            (IRTYPE) -- Default: 1       ! IRTYPE=  1  !                                                                                                                                   
+                                                                                                                                                                                                         
+      Compute special data fields required                                                                                                                                                               
+      by CALGRID (LCALGRD)            Default: T    ! LCALGRD = T !                                                                                                                                      
+                                                                                                                                                                                                         
+       Flag to stop run after                                                                                                                                                                            
+       SETUP phase (ITEST)             Default: 2       ! ITEST=  2   !                                                                                                                                  
+                                                                                                                                                                                                         
+      Test options specified to see if                                                                                                                                                                   
+      they conform to regulatory                                                                                                                                                                         
+      values? (MREG)                   No Default       ! MREG =   0   !                                                                                                                                 
+                                                                                                                                                                                                         
+ !END!                                                                                                                                                                                                   
+                                                                                                                                                                                                         
+ -------------------------------------------------------------------------------                                                                                                                         
+                                                                                                                                                                                                         
+ INPUT GROUP: 2 -- Map Projection and Grid control parameters                                                                                                                                            
+ --------------                                                                                                                                                                                          
+                                                                                                                                                                                                         
+      Map projection                                                                                                                                                                                     
+      (PMAP)                     Default: UTM    ! PMAP = UTM  !                                                                                                                                         
+                                                                                                                                                                                                         
+      False Easting and Northing (km) at the projection origin                                                                                                                                           
+      (Used only if PMAP= TTM, LCC, or LAZA)                                                                                                                                                             
+      (FEAST)                    Default=0.0   ! FEAST  = 0.0 !                                                                                                                                          
+      (FNORTH)                   Default=0.0   ! FNORTH = 0.0 !                                                                                                                                          
+                                                                                                                                                                                                         
+      UTM zone (1 to 60)                                                                                                                                                                                 
+      (Used only if PMAP=UTM)                                                                                                                                                                            
+      (IUTMZN)                   No Default      ! IUTMZN =  14   !                                                                                                                                      
+                                                                                                                                                                                                         
+      Hemisphere for UTM projection?                                                                                                                                                                     
+      (Used only if PMAP=UTM)                                                                                                                                                                            
+      (UTMHEM)                   Default: N    ! UTMHEM = N  !                                                                                                                                           
+          N   - Northern hemisphere                                                                                                                                                                      
+          S   - Southern hemisphere                                                                                                                                                                      
+                                                                                                                                                                                                         
+      Latitude and Longitude of N.pole or projection origin                                                                                                                                              
+      (Used only if PMAP= LCC, PS, EM, TTM, or LAZA)                                                                                                                                                     
+      (RLAT0)                    No Default      * RLAT0= 0N  *                                                                                                                                          
+      (RLON0)                    No Default      * RLON0= 0E  *                                                                                                                                          
+                                                                                                                                                                                                         
+      Matching parallels                                                                                                                                                                                 
+      (Used only if PMAP= LCC or PS)                                                                                                                                                                     
+      (XLAT1)                    No Default      * XLAT1= 30N *                                                                                                                                          
+      (XLAT2)                    No Default      * XLAT2= 60N *                                                                                                                                          
+                                                                                                                                                                                                         
+      DATUM for output coordinates                                                                                                                                                                       
+      (DATUM)                    Default: WGS-84    ! DATUM = WGS-84  !                                                                                                                                  
+                                                                                                                                                                                                         
+             No. X grid cells (NX)      No default     ! NX =  12  !                                                                                                                                     
+             No. Y grid cells (NY)      No default     ! NY =  12  !                                                                                                                                     
+      Grid spacing (DGRIDKM)            No default     ! DGRIDKM =  28.009  !                                                                                                                            
+                                              Units: km                                                                                                                                                  
+         X coordinate of SW corner                                                                                                                                                                       
+         of grid cell (1,1)                                                                                                                                                                              
+         (lower left corner of grid)                                                                                                                                                                     
+         X coordinate (XORIGKM)         No default     ! XORIGKM = 416.342  !                                                                                                                            
+         Y coordinate (YORIGKM)         No default     ! YORIGKM = 2126.983  !                                                                                                                           
+                                              Units: km                                                                                                                                                  
+                                                                                                                                                                                                         
+      Number of vertical layers (NZ)    No default     ! NZ = 8 !                                                                                                                                        
+                                                                                                                                                                                                         
+      Cell face heights                                                                                                                                                                                  
+         vertical grid (ZFACE(NZ+1))    No defaults                                                                                                                                                      
+                                              Units: m                                                                                                                                                   
+         ! ZFACE = 0.0, 20.0, 40.0, 80.0, 160.0, 300.0, 600.0, 1000.0, 1500.0  !                                                                                                                         
+                                                                                                                                                                                                         
+ !END!                                                                                                                                                                                                   
+                                                                                                                                                                                                         
+ -------------------------------------------------------------------------------                                                                                                                         
+                                                                                                                                                                                                         
+ INPUT GROUP: 3 -- Output Options                                                                                                                                                                        
+ --------------                                                                                                                                                                                          
+                                                                                                                                                                                                         
+      Disk Output                                                                                                                                                                                        
+      -----------                                                                                                                                                                                        
+      Save met. fields in unformatted                                                                                                                                                                    
+      output file ? (LSAVE)               Default: T     ! LSAVE = T !                                                                                                                                   
+      Type of unformatted output file:                                                                                                                                                                   
+      (IFORMO)                            Default: 1     ! IFORMO = 1 !                                                                                                                                  
+         1 = CALPUFF/CALGRID type file (CALMET.DAT)                                                                                                                                                      
+         2 = MESOPUFF-II type file (PACOUT.DAT)                                                                                                                                                          
+                                                                                                                                                                                                         
+      Line printer output flag                                                                                                                                                                           
+      (LPRINT)                            Default: F     ! LPRINT = F !                                                                                                                                  
+      Print interval (hours)                                                                                                                                                                             
+      (IPRINF)                            Default: 1     ! IPRINF = 1 !                                                                                                                                  
+                                                                                                                                                                                                         
+      ! IUVOUT = 1, 0, 0, 0, 0, 0, 0, 0 !                                                                                                                                                                
+      ! IWOUT  = 1, 0, 0, 0, 0, 0, 0, 0 !                                                                                                                                                                
+      ! ITOUT  = 1, 0, 0, 0, 0, 0, 0, 0 !                                                                                                                                                                
+                                                                                                                                                                                                         
+      ! STABILITY = F !                                                                                                                                                                                  
+      ! USTAR     = F !                                                                                                                                                                                  
+      ! MONIN     = F !                                                                                                                                                                                  
+      ! MIXHT     = F !                                                                                                                                                                                  
+      ! WSTAR     = F !                                                                                                                                                                                  
+      ! PRECIP    = F !                                                                                                                                                                                  
+      ! SENSHEAT  = F !                                                                                                                                                                                  
+      ! CONVZI    = F !                                                                                                                                                                                  
+                                                                                                                                                                                                         
+      Testing and debug print options                                                                                                                                                                    
+      ! LDB    = F   !                                                                                                                                                                                   
+      ! NN1    = 1   !                                                                                                                                                                                   
+      ! NN2    = 1   !                                                                                                                                                                                   
+      ! LDBCST = F   !                                                                                                                                                                                   
+      ! IOUTD  = 0   !                                                                                                                                                                                   
+      ! NZPRN2 = 1   !                                                                                                                                                                                   
+      ! IPR0   = 0   !                                                                                                                                                                                   
+      ! IPR1   = 0   !                                                                                                                                                                                   
+      ! IPR2   = 0   !                                                                                                                                                                                   
+      ! IPR3   = 0   !                                                                                                                                                                                   
+      ! IPR4   = 0   !                                                                                                                                                                                   
+      ! IPR5   = 0   !                                                                                                                                                                                   
+      ! IPR6   = 0   !                                                                                                                                                                                   
+      ! IPR7   = 0   !                                                                                                                                                                                   
+      ! IPR8   = 0   !                                                                                                                                                                                   
+                                                                                                                                                                                                         
+ !END!                                                                                                                                                                                                   
+                                                                                                                                                                                                         
+ -------------------------------------------------------------------------------                                                                                                                         
+                                                                                                                                                                                                         
+ INPUT GROUP: 4 -- Meteorological data options                                                                                                                                                           
+ --------------                                                                                                                                                                                          
+                                                                                                                                                                                                         
+     NO OBSERVATION MODE             (NOOBS)  Default: 0     ! NOOBS =  0   !                                                                                                                            
+                                                                                                                                                                                                         
+        Number of surface stations   (NSSTA)  No default     ! NSSTA =  1  !                                                                                                                             
+                                                                                                                                                                                                         
+        Number of precipitation stations                                                                                                                                                                 
+                                     (NPSTA)  No default     ! NPSTA =  0  !                                                                                                                             
+                                                                                                                                                                                                         
+        Gridded cloud fields:                                                                                                                                                                            
+                                    (ICLOUD)  Default: 0     ! ICLOUD =  0  !                                                                                                                            
+                                                                                                                                                                                                         
+        Surface meteorological data file format                                                                                                                                                          
+                                    (IFORMS)  Default: 2     ! IFORMS =  2  !                                                                                                                            
+        Precipitation data file format                                                                                                                                                                   
+                                    (IFORMP)  Default: 2     ! IFORMP =  2  !                                                                                                                            
+        Cloud data file format                                                                                                                                                                           
+                                    (IFORMC)  Default: 2     ! IFORMC =  2  !                                                                                                                            
+                                                                                                                                                                                                         
+ !END!                                                                                                                                                                                                   
+                                                                                                                                                                                                         
+ -------------------------------------------------------------------------------                                                                                                                         
+                                                                                                                                                                                                         
+ INPUT GROUP: 5 -- Wind Field Options and Parameters                                                                                                                                                     
+ --------------                                                                                                                                                                                          
+                                                                                                                                                                                                         
+        Model (IWFCOD)                    Default: 1      ! IWFCOD =  1  !                                                                                                                               
+        Compute Froude number adjustment                                                                                                                                                                 
+        effects? (IFRADJ)                 Default: 1      ! IFRADJ =  1  !                                                                                                                               
+        Compute kinematic effects? (IKINE) Default: 0      ! IKINE  =  0  !                                                                                                                              
+        Use O'Brien procedure for adjustment                                                                                                                                                             
+        of the vertical velocity? (IOBR)  Default: 0      ! IOBR   =  0  !                                                                                                                               
+        Compute slope flow effects? (ISLOPE) Default: 1    ! ISLOPE =  1  !                                                                                                                              
+                                                                                                                                                                                                         
+        Extrapolate surface wind observations                                                                                                                                                            
+        to upper layers (IEXTRP)          Default: -4     ! IEXTRP = -4  !                                                                                                                               
+        Extrapolate surface winds even if                                                                                                                                                                
+        calm? (ICALM)                     Default: 0      ! ICALM  =  0  !                                                                                                                               
+                                                                                                                                                                                                         
+        Layer-dependent biases (BIAS(NZ))                                                                                                                                                                
+                                ! BIAS =  0, 0, 0, 0, 0, 0, 0, 0  !                                                                                                                                      
+                                                                                                                                                                                                         
+        Minimum distance from nearest upper air station                                                                                                                                                  
+        to surface station (RMIN2)                                                                                                                                                                       
+                                              Default: 4.     ! RMIN2 = -1.0 !                                                                                                                           
+                                                                                                                                                                                                         
+        Use gridded prognostic wind field model                                                                                                                                                          
+        output fields (IPROG)              Default: 0      ! IPROG =  14  !                                                                                                                              
+                                                                                                                                                                                                         
+        Timestep (seconds) of the prognostic                                                                                                                                                             
+        model input data   (ISTEPPGS)         Default: 3600   ! ISTEPPGS =  3600   !                                                                                                                     
+                                                                                                                                                                                                         
+        Use coarse CALMET fields as initial guess fields (IGFMET)                                                                                                                                        
+                                              Default: 0      ! IGFMET =  0  !                                                                                                                           
+                                                                                                                                                                                                         
+        Use varying radius of influence       Default: F      ! LVARY =  T!                                                                                                                              
+                                                                                                                                                                                                         
+        Maximum radius of influence over land                                                                                                                                                            
+        in the surface layer (RMAX1)          No default      ! RMAX1 = 50. !                                                                                                                            
+        Maximum radius of influence over land                                                                                                                                                            
+        aloft (RMAX2)                         No default      ! RMAX2 = 50. !                                                                                                                            
+        Maximum radius of influence over water                                                                                                                                                           
+        (RMAX3)                               No default      ! RMAX3 = 50. !                                                                                                                            
+                                                                                                                                                                                                         
+        Minimum radius of influence used in                                                                                                                                                              
+        the wind field interpolation (RMIN)   Default: 0.1    ! RMIN = 0.1 !                                                                                                                             
+        Radius of influence of terrain                                                                                                                                                                   
+        features (TERRAD)                     No default      ! TERRAD = 5. !                                                                                                                            
+                                                                                                                                                                                                         
+        Relative weighting surface (R1)       No default      ! R1 = 1. !                                                                                                                                
+        Relative weighting aloft (R2)         No default      ! R2 = 1. !                                                                                                                                
+        Relative weighting of the prognostic                                                                                                                                                             
+        wind field data (RPROG)               No default      ! RPROG = 0.0 !                                                                                                                            
+                                                                                                                                                                                                         
+        Maximum acceptable divergence                                                                                                                                                                    
+        (DIVLIM)                              Default: 5.E-6  ! DIVLIM = 5.0E-6 !                                                                                                                        
+        Maximum number of iterations in the                                                                                                                                                              
+        divergence minimization procedure                                                                                                                                                                
+        (NITER)                               Default: 50     ! NITER = 50 !                                                                                                                             
+        Number of stations used in each layer                                                                                                                                                            
+        for the interpolation of data to a                                                                                                                                                               
+        grid point (NINTR2(NZ))                                                                                                                                                                          
+                                ! NINTR2 = 99, 99, 99, 99, 99, 99, 99, 99 !                                                                                                                              
+                                                                                                                                                                                                         
+        Critical Froude number (CRITFN)       Default: 1.0    ! CRITFN = 1.0 !                                                                                                                           
+        Empirical factor controlling the                                                                                                                                                                 
+        influence of kinematic effects                                                                                                                                                                   
+        (ALPHA)                               Default: 0.1    ! ALPHA = 0.1 !                                                                                                                            
+                                                                                                                                                                                                         
+        Number of barriers to interpolation                                                                                                                                                              
+        of the wind fields (NBAR)             Default: 0      ! NBAR = 0 !                                                                                                                               
+        ! KBAR = 8 !                                                                                                                                                                                     
+        ! XBBAR = 0.0 !                                                                                                                                                                                  
+        ! YBBAR = 0.0 !                                                                                                                                                                                  
+        ! XEBAR = 0.0 !                                                                                                                                                                                  
+        ! YEBAR = 0.0 !                                                                                                                                                                                  
+                                                                                                                                                                                                         
+        Method used to compute surface                                                                                                                                                                   
+        temperatures (IDIOPT1)                Default: 0      ! IDIOPT1 = 0 !                                                                                                                            
+        Surface met station to use for the                                                                                                                                                               
+        surface temperature (ISURFT)                                                                                                                                                                     
+                                              No default      ! ISURFT = 1 !                                                                                                                             
+                                                                                                                                                                                                         
+        Method used to compute domain-averaged                                                                                                                                                           
+        temperature lapse rate (IDIOPT2)      Default: 0      ! IDIOPT2 = 0 !                                                                                                                            
+        Upper air station to use for the                                                                                                                                                                 
+        domain-scale lapse rate (IUPT)                                                                                                                                                                   
+                                              No default      ! IUPT = 1 !                                                                                                                               
+        Depth (m) through which the domain-scale                                                                                                                                                         
+        lapse rate is computed (ZUPT)         Default: 200.   ! ZUPT = 200. !                                                                                                                            
+                                                                                                                                                                                                         
+        Method used to compute domain-averaged                                                                                                                                                           
+        wind components (IDIOPT3)             Default: 0      ! IDIOPT3 = 0 !                                                                                                                            
+        Upper air station to use for the                                                                                                                                                                 
+        domain-scale winds (IUPWND)                                                                                                                                                                      
+                                              Default: -1     ! IUPWND = -1 !                                                                                                                            
+        Bottom and top of layer (m) through                                                                                                                                                              
+        which domain-scale winds are computed                                                                                                                                                            
+        (ZUPWND(1), ZUPWND(2))                                                                                                                                                                           
+                                              Default: 1., 1000. ! ZUPWND = 1., 1000. !                                                                                                                  
+                                                                                                                                                                                                         
+        Selection of observed surface wind                                                                                                                                                               
+        components (IDIOPT4)                  Default: 0      ! IDIOPT4 = 0 !                                                                                                                            
+        Selection of observed upper air wind                                                                                                                                                             
+        components (IDIOPT5)                  Default: 0      ! IDIOPT5 = 0 !                                                                                                                            
+                                                                                                                                                                                                         
+        ! LLBREZE = F !                                                                                                                                                                                  
+        ! NBOX = 0 !                                                                                                                                                                                     
+        ! XG1 = 0.0 !                                                                                                                                                                                    
+        ! XG2 = 0.0 !                                                                                                                                                                                    
+        ! YG1 = 0.0 !                                                                                                                                                                                    
+        ! YG2 = 0.0 !                                                                                                                                                                                    
+        ! XBCST = 0.0 !                                                                                                                                                                                  
+        ! YBCST = 0.0 !                                                                                                                                                                                  
+        ! XECST = 0.0 !                                                                                                                                                                                  
+        ! YECST = 0.0 !                                                                                                                                                                                  
+        ! NLB = 0 !                                                                                                                                                                                      
+        ! METBXID = 0 !                                                                                                                                                                                  
+                                                                                                                                                                                                         
+        ! NSMTH = 2, 4, 4, 4, 4, 4, 4, 4 !                                                                                                                                                               
+        ! FEXTR2 = 0, 0, 0, 0, 0, 0, 0, 0 !                                                                                                                                                              
+                                                                                                                                                                                                         
+ !END!                                                                                                                                                                                                   
+                                                                                                                                                                                                         
+ -------------------------------------------------------------------------------                                                                                                                         
+                                                                                                                                                                                                         
+ INPUT GROUP: 6 -- Mixing Height, Temperature and Precipitation Parameters                                                                                                                               
+ --------------                                                                                                                                                                                          
+                                                                                                                                                                                                         
+        ! CONSTB  = 1.41 !                                                                                                                                                                               
+        ! CONSTE  = 0.15 !                                                                                                                                                                               
+        ! CONSTN  = 2400. !                                                                                                                                                                              
+        ! CONSTW  = 0.16 !                                                                                                                                                                               
+        ! FCORIOL = 1.0E-4 !                                                                                                                                                                             
+                                                                                                                                                                                                         
+        ! IAVEZI = 1 !                                                                                                                                                                                   
+        ! MNMDAV = 1 !                                                                                                                                                                                   
+        ! HAFANG = 30. !                                                                                                                                                                                 
+        ! ILEVZI = 1 !                                                                                                                                                                                   
+                                                                                                                                                                                                         
+        ! IMIXH   = 1 !                                                                                                                                                                                  
+        ! THRESHL = 0.05 !                                                                                                                                                                               
+        ! THRESHW = 0.05 !                                                                                                                                                                               
+        ! ITWPROG = 0 !                                                                                                                                                                                  
+        ! ILUOC3D = 16 !                                                                                                                                                                                 
+                                                                                                                                                                                                         
+        ! DPTMIN = 0.001 !                                                                                                                                                                               
+        ! DZZI   = 200. !                                                                                                                                                                                
+        ! ZIMIN  = 50. !                                                                                                                                                                                 
+        ! ZIMAX  = 3000. !                                                                                                                                                                               
+        ! ZIMINW = 50. !                                                                                                                                                                                 
+        ! ZIMAXW = 3000. !                                                                                                                                                                               
+                                                                                                                                                                                                         
+        ! ICOARE = 10 !                                                                                                                                                                                  
+        ! DSHELF = 0.0 !                                                                                                                                                                                 
+        ! IWARM  = 0 !                                                                                                                                                                                   
+        ! ICOOL  = 0 !                                                                                                                                                                                   
+                                                                                                                                                                                                         
+        ! IRHPROG = 0 !                                                                                                                                                                                  
+        ! ITPROG  = 0 !                                                                                                                                                                                  
+        ! IRAD   = 1 !                                                                                                                                                                                   
+        ! TRADKM = 500. !                                                                                                                                                                                
+        ! NUMTS  = 5 !                                                                                                                                                                                   
+        ! IAVET  = 1 !                                                                                                                                                                                   
+        ! TGDEFB = -0.0098 !                                                                                                                                                                             
+        ! TGDEFA = -0.0045 !                                                                                                                                                                             
+        ! JWAT1  = 999 !                                                                                                                                                                                 
+        ! JWAT2  = 999 !                                                                                                                                                                                 
+                                                                                                                                                                                                         
+        ! NFLAGP = 2 !                                                                                                                                                                                   
+        ! SIGMAP = 100. !                                                                                                                                                                                
+        ! CUTP   = 0.01 !                                                                                                                                                                                
+                                                                                                                                                                                                         
+ !END!                                                                                                                                                                                                   
+
+ -------------------------------------------------
+ NOTICE: Starting year in control file sets the
+         expected century for the simulation.  All
+         YY years are converted to YYYY years in
+         the range:         1955        2054
+ -------------------------------------------------
+
+
+ -------------------------------------------------
+ NOTICE: Starting year in control file sets the
+         expected century for the simulation.  All
+         YY years are converted to YYYY years in
+         the range:         1955        2054
+ -------------------------------------------------
+
+
+ READCF:  Warning in Input Group 5
+ BIAS(1) reset to -1. to be consistent with
+ IEXTRP
+ (i.e., upper air data not used in Layer 1)
+
+
+
+ Grid origin coordinates: (SW corner of cell 1,1)
+   XMAP0 =    416.342010      (km)
+   YMAP0 =    2126.98291      (km)
+  N.Lat0 =    19.2346516      (deg)
+  E.Lon0 =   -99.7959518      (deg)
+  W.Lon0 =    99.7959518      (deg)
+
+
+                              SURFACE STATIONS
+                                                                     Time   Anemometer     Grid Coordinates
+ Name     ID          X            Y        NLatitude    WLongitude  Zone    Height           X         Y
+                    (km)         (km)         (Deg)        (Deg)              (m)          (Origin = (0,0))
+
+ WRF1    88801        584.4       2295.0       20.753       98.189    0.0    10.0            6.000     6.000
+
+
+                              UPPER AIR STATIONS
+                                                                     Time     Grid Coordinates
+ Name     ID          X            Y        NLatitude    WLongitude  Zone        X         Y
+                    (km)         (km)         (Deg)        (Deg)              (Origin = (0,0))
+
+ WRF1   88801         584.4       2295.0       20.753       98.189    0.0       6.000     6.000
+
+      NO PRECIPITATION STATIONS
+
+
+  Input group no. 1 -- General run parameters
+        Run starting date -- year: 2005
+                            month:    8
+                              day:   28
+                       Julian day:  240
+                             hour:    0
+                           second:    0
+         Run  ending date -- year: 2005
+                            month:    8
+                              day:   28
+                       Julian day:  240
+                             hour:    3
+                           second:    0
+                    UTC time zone: UTC+0000
+
+               Run length (hours):    3
+
+                         Run type:    1 (0=winds only, 1=winds + other met. variables)
+     Complete met fields computed:    T
+
+                    TEST mode run:    2 (1=yes, 2=no)
+                 Regulatory check:    0 (0=none, 1=USEPA)
+
+
+  Input group no. 2 -- Grid parameters
+           No. horizontal grid cells:       12 x   12
+            Horizontal grid size (m):    28009.
+            Reference coordinates of  
+        SW corner of grid cell (1,1): ( 416342.,2126983.)
+       N.Latitude SW corner of (1,1):   19.23
+      W.Longitude SW corner of (1,1):   99.80
+                      Map Projection: UTM     
+                       NIMA Datum ID: WGS-84  
+                           NIMA Date: 02-21-2003  
+                      UTM Hemisphere: N   
+                            UTM Zone:   14
+
+            No. vertical grid cells:        8
+     Vertical cell face heights (m):      0.0    20.0    40.0    80.0   160.0   300.0   600.0  1000.0  1500.0
+            Cell center heights (m):     10.0    30.0    60.0   120.0   230.0   450.0   800.0  1250.0
+
+
+  Input group no. 3 -- Output options
+           Meteorological fields save in disk file ? (LSAVE) =     T
+                              Format of output file (IFORMO) =     1   (1=CALMET, 2=MESOPAC II)
+                    Meteorological fields printed ? (LPRINT) =     F
+                                     Print interval (IPRINF) =     1
+     Input met. data and internal parameters printed ? (LDB) =     F
+      Time steps for which LDB parameters printed (NN1, NN2) =     1 to     1
+     Distance to the coast printed in grd file? (LDBCST) =     F
+
+
+           Control variables for printing of 3-D fields
+                    (used only if LPRINT = .TRUE.)
+                         (0=not printed, 1=printed)
+                     LEVEL   U,V    W    TEMP
+
+                       1      1     1     1
+                       2      0     0     0
+                       3      0     0     0
+                       4      0     0     0
+                       5      0     0     0
+                       6      0     0     0
+                       7      0     0     0
+                       8      0     0     0
+
+           Control variables for printing of other met. fields
+                    (used only if LPRINT = .TRUE.)
+                       VARIABLE                     PRINTED (0=no, 1=yes)
+                       PGT stability class             0
+                       Friction velocity (u*)          0
+                       Monin-Obukhov length (L)        0
+                       Mixing height (zi)              0
+                       Convective velocity scale (w*)  0
+                       Precipitation rate              0
+
+                       Sensible heat flux (Qh)         0
+                       Convective mixing ht            0
+
+
+  Input group no. 4 -- Meteorological data options
+        MM4/5 only flag (NOOBS):    0
+           No. surface stations:    1     Format type:    2
+        No. rawinsonde stations:    1
+     No. precipitation stations:    0     Format type:    2
+     (if NPSTA = -1: precipitation read from MM5)
+         No. overwater stations:    0
+                                          (Format type 1=unformatted, 2=formatted)
+
+      Gridded cloud data option:    0     (0=CLOUD.DAT not used,
+                                           1=CLOUD.DAT created as OUTPUT,
+                                           2=CLOUD.DAT read as INPUT,
+                                           3=CLOUD computed from progn. RH at 850mb (Teixera),
+                                           4=CLOUD computed from progn. RH at all levels(MM5toGrads)
+
+
+  Input group no. 5 -- Wind field parameters
+                                   Wind field code =        1 (0 = objective analysis, 1 = diagnostic)
+     Varying radius of influence           (LVARY) =          T
+     Radius of influence - land - surface  (rmax1) =       50.0 (km)
+     Radius of influence - land - aloft    (rmax2) =       50.0 (km)
+     Radius of influence - water           (rmax3) =       50.0 (km)
+     Radius of influence - minimum          (rmin) =        0.1 (km)
+     Radius of influence - terrain        (terrad) =        5.0 (km)
+     Weighting parameter - surface            (r1) =        1.0
+     Weighting parameter - aloft              (r2) =        1.0
+
+     Maximum no. stations used in interpolation at one grid point in each level (nintr2):
+            99  99  99  99  99  99  99  99
+
+     Gridded prognostic model results used as input = 14
+       0 = no
+       1 = Use CSUMM model winds as Step 1 inputs
+       2 = Use CSUMM model winds as initial guess field
+       3 = Use MM4.DAT file winds as Step 1 inputs
+       4 = Use MM4.DAT file winds as initial guess field
+       5 = Use MM4.DAT file winds as "observations"
+      13 = Use MM5.DAT file winds as Step 1 inputs
+      14 = Use MM5.DAT file winds as initial guess field
+      15 = Use MM5.DAT file winds as "observations"
+     Weighting parameter for prognostic data  (rprog) =        0.0 (km)
+
+
+     Prognostic model output timestep (seconds): 3600
+
+     Use coarse CALMET fields as IGF:   0
+       0 = no
+       1 = yes
+
+
+  LAKE BREEZE parameters
+     Utilize the Lake Breeze Module of CALMET (LLBREZE) = F
+     Number of regions (NBOX)  =          0
+
+
+ divlim,niter =    4.99999987E-06          50
+ nsmth            2           4           4           4           4           4           4           4
+ iextrp =           -4  rmin2 =   -1.00000000      fextr2 =    0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000    
+ bias =   -1.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000       0.00000000    
+ critfn,terrad,ifradj,ikine,alpha,iobr =    1.00000000       5.00000000               1           0  0.100000001               0
+ islope,icalm           1           0
+ nzprn2,ipr0,ipr1,ipr2,ipr3,ipr4,ipr5,ipr6,ipr7,ipr8,ioutd =            1           0           0           0           0           0           0           0           0           0           0
+
+     Specification for diagnostic wind module data input
+
+                       Surface temperature: 0 (0=computed internally, 1=preprocessed values input)
+          Domain-averaged temp. lapse rate: 0 (0=computed internally, 1=preprocessed values input)
+           Domain-averaged wind components: 0 (0=computed internally, 1=preprocessed values input)
+                   Surface wind components: 0 (0=computed internally, 1=preprocessed values input)
+                 Upper air wind components: 0 (0=computed internally, 1=preprocessed values input)
+
+      Surface station no. used for surf. temp. in diagnostic wind field module (-1 is 2D array):            1
+
+  Domain averaged lapse rate 
+      Upper air station no. used for domain-averaged temp. lapse rate (IUPT):            1
+      Depth through which temp.lapse rate is computed (ZUPT):    200.000000    
+
+
+  Input group no. 6 -- Mixing height, temperature, radiation and precipitation parameters
+      Neutral mechanical mix. ht. constant (constb) =     1.4100
+         Convective mixing height constant (conste) =     0.1500
+             Stable mixing height constant (constn) =  2400.0000
+          Overwater mixing height constant (constw) =     0.1600
+     Absolute value of Coriolis parameter (fcoriol) =  1.000E-04 (1/s)
+
+       Minimum pot. temp. lapse rate in layer above
+                     current mixing height (dptmin) =     0.0010 (deg. K/m)
+        Depth of layer above mixing height used to 
+                          compute lapse rate (dzzi) =   200.0000 (m)
+          Precip interp. option:    2
+      Rad. Inf. for Precip (km):   100.0000
+      Min. Prec. cutoff (mm/hr):     0.0100
+
+-----Convective Mixing Height options-----
+      Method used to compute mixing height (imixh)   1
+        1 = Maul-Carson for land and water cells
+       -1 = Maul-Carson for land cells only; OCD overwater
+        2 = Batchvarova and Gryning for land and water cells
+       -2 = Batchvarova and Gryning for land cells only;OCD overwater
+
+      Threshold buoyancy fluxes required to sustain convective
+      mixing height growth (in W/m3):
+        Overland  (THRESHL) =  0.050
+        Overwater (THRESHW) =  0.050
+      Overwater lapse rates used in conv. mix.hgt growth:  0
+        0 : SEA.DAT lapse rates and deltaT (neutral if missing)
+        1 : progn. lapse rates & SEA.DAT deltaT (neutral if mis.)
+        2 : progn.lapse rates and progn. deltaT
+
+      LU category in progn. datasets (ILUOC3d):  16
+
+-----Overwater surface fluxes-----
+      Method used to compute overwater fluxes (icoare)  10
+         0 = original deltaT method (OCD)
+        10 = COARE with no wave parameterization
+        11 = COARE with wave option jwave=1 (Oost et al.)
+       -11 = COARE with wave option jwave=1 and obs. wave prop.
+        12 = COARE with wave option jwave=2 (Taylor and Yelland)
+       -11 = COARE with wave option jwave=2 and obs. wave prop.
+
+           (internal ipsifcn set to            0 )
+           (internal isfcmet set to            0 )
+
+     Coastal/Shallow water length scale (DSHELF in km)   0.0
+     COARE warm layer computation (IWARM)(1:on-0:off):  0
+     COARE cool skin  computation (ICOOL)(1:on-0:off):  0
+
+
+
+----- Other Mixing Height Parameters-----
+             Maximum overland mixing height (zimax) =  3000.0000 (m)
+             Minimum overland mixing height (zimin) =    50.0000 (m)
+      Minimum computed overwater mixing ht (ziminw) =    50.0000 (m)
+      Maximum computed overwater mixing ht (zimaxw) =  3000.0000 (m)
+
+        Spatial averaging of mixing hts. ? (iavezi) =          1 (0=no, 1=yes)
+      Max. search radius in mixing ht ave. (mnmdav) =          1 (grid cells)
+                 Half-angle of upwind cone (hafang) =    30.0000 (deg.)
+        Level of winds used in upwind ave. (ilevzi) =          1
+
+     Temperature interpolation type (1=1/R;2=1/R**2)=          1
+
+     Radius of influence - temperature interpolation=      500.0 (km)
+
+     3-D temperature option- ITPROG = 0
+     0= Temperature from surface and upper air observations
+     1= Temperature from surface obs. and prognostic data 
+     2= Temperature from prognostic data only
+
+     Spatial averaging of temperature ? (iavet)     =          1 (0=no, 1=yes)
+
+     Default T gradient below mix. ht. over water   =    -0.0098 (K/m)
+
+     Default T gradient above mix. ht. over water   =    -0.0045 (K/m)
+
+
+  Beginning land use       Ending land use for water interpolation 
+
+           999                  999
+
+
+ Radiation parameters
+     Turbidity coefficient 1 (ha1)  =     990.00 (W/m**2)
+     Turbidity coefficient 2 (ha2)  =     -30.00 (W/m**2)
+     Cloudiness coefficient 1 (hb1) =    -0.7500
+     Cloudiness coefficient 2 (hb2) =     3.4000
+     Net radiation coefficient 1 (hc1) =   5.3100E-13 (W/m**2/K**6)
+     Net radiation coefficient 2 (hc2) =      60.00(W/m**2)
+     Net radiation coefficient 3 (hc3) =     0.1200
+
+
+ ----------------------------------------------------------------------------------------------------------------------------------
+          INPUT FILES
+
+ Default Name     Unit No.     File Name and Path
+ ------------     --------     ------------------
+   CALMET.INP        15        calmet.inp                                                                                                                          
+      GEO.DAT         8        geo.dat                                                                                                                             
+     SURF.DAT        10        surf.dat                                                                                                                            
+
+     MM51.DAT        20        3d.dat                                                                                                                              
+
+      UP1.DAT        30        up.dat                                                                                                                              
+
+
+ ----------------------------------------------------------------------------------------------------------------------------------
+          OUTPUT FILES
+
+ Default Name     Unit No.     File Name and Path
+ ------------     --------     ------------------
+   CALMET.LST        16        calmet.lst                                                                                                                          
+   CALMET.DAT         7        calmet.dat                                                                                                                          
+
+
+
+
+GEO.DAT File Header ----------
+
+GEO.DAT         2.0             Header structure with coordinate parameters                     
+   1
+wrf_demo GEO from NCAR wrfout_d01_2005-08-28 (Katrina tutorial)                 
+UTM     
+  14N   
+WGS-84  08-28-2005  
+      12      12     416.342    2126.983      28.009      28.009
+KM  
+
+
+
+ Default land use categories used
+
+
+ Land use categories                                                   
+ Multiply all values by 10 **  -2
+
+  12 I 2000  2000  1000  2000  2000  2000  2000  2000  2000  2000  2000  2000
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+  11 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  2000
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+  10 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  2000
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   9 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  2000
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   8 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   7 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  2000  5500  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   6 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  5500  5500  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   5 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  5500  5500  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   4 I 2000  2000  2000  2000  2000  2000  2000  2000  2000  5500  5500  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   3 I 2000  2000  2000  2000  2000  2000  2000  2000  5500  5500  5500  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   2 I 2000  2000  2000  2000  2000  2000  2000  2000  5500  5500  5500  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   1 I 2000  2000  2000  2000  2000  2000  2000  5500  5500  5500  5500  5500
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+     -----------------------------------------------------------------------
+          1     2     3     4     5     6     7     8     9    10    11    12
+
+
+ Factor to convert user TERRAIN HEIGHT units to meters (HTFAC) =     1.0000
+
+
+ Terrain heights (user units)                                          
+ Multiply all values by 10 **   0
+
+  12 I 2884  2858  2628  2698  2816  2605  2566  2575  2682  2587  1600   558
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+  11 I 2748  2609  2370  2431  2621  2675  2645  2533  2440  2172  1500   695
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+  10 I 2650  2428  2298  2416  2606  2663  2377  1912  1569  1212   845   466
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   9 I 2448  2251  2206  2347  2441  2313  1744   976   507   286   161    92
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   8 I 2164  2094  2065  2066  2006  1683  1025   405   114    38    23     1
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   7 I 1957  1915  1846  1750  1530  1030   493   208    97    42     6     0
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   6 I 1858  1664  1471  1335  1006   537   250   139    60    14     0     0
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   5 I 1611  1403  1213   827   434   239   167   129    48     0     0     0
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   4 I 1242  1141  1043   479    97   101   106    90    33     0     0     0
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   3 I 1036   847   610   223    28    55    57    36     8     0     0     0
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   2 I 1068   762   297    76    35    31    29    15     2     0     0     0
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+   1 I 1193   872   328   107    51    14    13     7     1     0     0     0
+     I    +     +     +     +     +     +     +     +     +     +     +     +
+     -----------------------------------------------------------------------
+          1     2     3     4     5     6     7     8     9    10    11    12
+
+
+  Surface roughness (z0) computed from default z0-land use table
+
+
+  Land Use      Roughness
+  Category        Length
+                   (m)
+
+     10          1.0000
+     20          0.2500
+    -20          0.2500
+     30          0.0500
+     40          1.0000
+     50          0.0010
+     54          0.0010
+     55          0.0010
+     60          1.0000
+     61          1.0000
+     62          0.2000
+     70          0.0500
+     80          0.2000
+     90          0.0500
+
+
+  Albedo computed from default albedo-land use table
+
+
+  Bowen ratio computed from default Bowen ratio-land use table
+
+
+  Soil heat flux parameter computed from default Soil parameter-land use table
+
+
+  Anthropogenic heat flux computed from default Heat flux-land use table
+
+
+  Leaf area index computed from default Leaf area index-land use table
+
+
+
+Surface Met File Header ------
+
+SURF.DAT        2.1             Hour Start and End Times with Seconds                           
+           1
+Synthetic SURF from wrfout near-surface (center); hourly interp; not real obs   
+NONE    
+UTC+0000
+        2005         240           0           0        2005         240           3           0           1
+       88801
+
+
+
+  Data from Surface met. file header records
+
+           Format code:     2
+          Packing code:     0
+             Time zone:     0
+          No. stations:     1
+
+        Beginning year:  2005
+            Julian day:   240
+                  hour:     0
+
+           Ending year:  2005
+            Julian day:   240
+                  hour:     3
+
+
+  Surface met. station ID numbers: 
+
+    No.      ID
+     1      88801
+
+
+
+UP.DAT File Header -----------
+
+UP.DAT          2.1             Hour Start and End Times with Seconds                           
+           1
+Synthetic UP from wrfout column at domain center; not real radiosonde           
+NONE    
+UTC+0000
+  2005  239    0    0 2005  241    0    0  50.    0    2
+     F    F    F    F
+
+
+
+  Data from Upper Air data file -- no.:     1   unit no.:    30
+
+
+      Starting date:                Ending date:
+               Year = 2005                 Year = 2005
+          Julian day = 239            Julian day = 241
+                Hour =   0                  Hour =   0
+
+
+      Pressure levels extracted:
+
+                          Surface to    50. mb
+
+      Data type (JDAT):  3 (1=TD6201, 2=NCDC CD, 3=other/unknown)
+      Data format (IFMT):  2 (1=slash-delimited, 2=comma-delimited)
+
+
+      Data level eliminated if height missing ?         F
+
+      Data level eliminated if temperature missing ?    F
+
+      Data level eliminated if wind direction missing ? F
+
+      Data level eliminated if wind speed missing ?     F
+
+
+ Information read from 3D.DAT file
+     Dataset Name:    3D.DAT      
+     Dataset Version: 2.1         
+     Dataset Title:   Header Structure with Comment Lines                             
+     First line of comments:         Katrina tutorial hourly-interp 00-03 UTC via wrfout_to_3d                                                                           
+
+     MM5 physics options: 
+         Hydrostatic:            0
+         Moisture scheme:        0
+         Convection scheme:      0
+         Boundary layer scheme:  0
+         Radiation scheme        0
+         Soil scheme:            0
+         Analysis FDDA:          0
+         Observation FDDA:       0
+
+     MM5 surface variable options: 
+         Ground temperature:     0
+         PBL:                    0
+         Sensible heat flux:     0
+         Latent heat flux:       0
+         Frictional velocity:    0
+         Downward SW radiation:  0
+         Downward LW radiation:  0
+         Soil temp at layer 1:   0
+         Soil temp at layer 2:   0
+         Soil temp at layer 3:   0
+         Soil temp at layer 4:   0
+         Soil temp at layer 5:   0
+         Soil temp at layer 6:   0
+
+     MM5 output fields (1 = YES; 0 = NO): 
+      Pressure, height,T,Wind speed and direction:  1
+                                Vertical velocity:  1
+                        RH and vapor mixing ratio:  1
+                     Cloud and rain mixing ratios:  0
+                       Ice and Snow mixing ratios:  0
+                                          Graupel:  0
+
+     Date/time (YYYYMMDDHH) of MM5 data: 
+                       Start = 2005 828 0 (GMT)
+                   No. hours =    4
+     Extraction Subdomain in MM5 file: 
+                 No. X cells =   14
+                 No. Y cells =   14
+                 No. layers  =   10
+
+                 Beginning X =    1
+                 Beginning Y =    1
+                 Beginning Z =    1
+                    Ending X =   14
+                    Ending Y =   14
+                    Ending Z =   10
+
+      Latitude range :   19.1075  -    22.3873
+      Longitude range:   -99.9285 -   -96.4206
+
+     MM5 half-sigma levels
+     Level     Sigma
+
+       1      0.9970
+       2      0.9890
+       3      0.9780
+       4      0.9640
+       5      0.9470
+       6      0.9250
+       7      0.9000
+       8      0.8630
+       9      0.8170
+      10      0.7710
+
+      Lat./Lon./Elev. of First Cell:   19.1075  -99.9285  2566
+      Lat./Lon./Elev. of Last  Cell:   22.3873  -96.4206     0
+
+
+  LAST PERIOD PROCESSED ENDS AT:
+       Year: 2005  Month:  8   Day: 28   Julian day: 240   Hour:  3   Second:    0
+
+
+  End of run -- Clock time: 00:15:31
+                      Date: 18-Sep-2026 
+
+        Elapsed clock time:        0.0 (seconds)
+
+                  CPU time:        0.6 (seconds)

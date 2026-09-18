@@ -4,14 +4,13 @@ Pure-NumPy diagnostic meteorological downscaling inspired by CALMET (CALPUFF sys
 
 ## Status
 
-v0.0.1 — core wind + PBL parity against a tiny Fortran-CALMET golden domain
-(`cases/small_domain`, 12×12 @ 1 km, 2020-06-15 00–03 UTC) for three modes:
+**v0.1.0** — expanded diagnostic core + CALMET.DAT/NetCDF writers + `wrf_demo` case
+from a public NCAR Katrina tutorial wrfout.
 
-| Mode | Description |
-|------|-------------|
-| `obs` | Surface + upper-air observations |
-| `obs_model` | Observations + 3D.DAT initial-guess field |
-| `noobs` | Model-only (3D.DAT / NOOBS=2) |
+| Case | Grid | Modes |
+|------|------|-------|
+| `cases/small_domain` | 12×12 @ 1 km, synthetic | `obs` / `obs_model` / `noobs` |
+| `cases/wrf_demo` | 12×12 @ ~28 km, NCAR wrfout subset | `obs` / `obs_model` / `noobs` |
 
 ## Install
 
@@ -23,7 +22,7 @@ pytest -q
 ## Quick start
 
 ```python
-from py_calmet import run_calmet, read_calmet_dat
+from py_calmet import run_calmet, read_calmet_dat, write_calmet_dat, write_calmet_netcdf
 
 res = run_calmet("cases/small_domain/goldens/obs", mode="obs",
                  inputs_dir="cases/small_domain/goldens/inputs")
@@ -32,20 +31,29 @@ print(res.U.shape)  # (ntime, nz, ny, nx)
 gold = read_calmet_dat("cases/small_domain/goldens/obs/CALMET.DAT")
 ```
 
+WRF → 3D.DAT:
+
+```bash
+python scripts/wrfout_to_3d.py path/to/wrfout_d01 -o 3d.dat --i0 4 --j0 0 --ni 14 --nj 14
+```
+
 ## Package layout
 
-- `py_calmet/io/` — GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT readers
-- `py_calmet/core/` — diagnostic winds (3D interp, SIMILT helpers, OA blend) + PBL (ELUSTR/MIXHT night)
-- `tests/` — reader smoke tests + golden parity (thresholds in `tests/thresholds.py`)
-- `cases/small_domain/goldens/` — archived Fortran outputs + shared inputs
+- `py_calmet/io/` — GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT **readers + writers**, NetCDF writer
+- `py_calmet/core/` — diagnostic winds (3D interp, SIMILT, OA, **slope flow**, **divergence minimization**, kinematic W) + PBL (**night + daytime Carson**)
+- `scripts/wrfout_to_3d.py` — wrfout NetCDF → 3D.DAT
+- `tests/` — reader smoke, synthetic golden parity, wrf_demo parity, physics/writer unit tests
+- `cases/small_domain/goldens/` — synthetic Fortran goldens
+- `cases/wrf_demo/` — public wrfout-based case (see `cases/wrf_demo/README.md`)
 
 ## Parity thresholds
 
-Relative RMSE gates are documented in `tests/thresholds.py` and `PROGRESS.md`.
-Core layer-1 U/V and ZI/USTAR for `obs` are ~1e-2 or better; full 3-D winds for
-`obs`/`obs_model` are best-effort approximations of CALMET DIAGNO pending a fuller port.
+Relative RMSE gates live in `tests/thresholds.py`. Tiny-domain core U/V/ZI/USTAR
+remain tight (~1e-2). `wrf_demo` uses looser relative-RMSE gates plus U/V correlation
+floors (complex terrain; DIAGNO still approximate).
 
 ## License / attribution
 
 CALMET algorithm references: Scire et al. / Exponent CALPUFF system documentation.
 This repository does **not** redistribute Fortran CALMET sources.
+WRF sample: NCAR `wrf_tutorial_data` (Katrina tutorial).

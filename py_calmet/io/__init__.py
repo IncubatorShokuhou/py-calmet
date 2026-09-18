@@ -1,6 +1,6 @@
 """Input/output readers for CALMET-related formats."""
 
-from .calmet_dat import CalmetDataset, read_calmet_dat
+from .calmet_dat import CalmetDataset, read_calmet_dat, write_calmet_dat, write_calmet_netcdf
 from .geo import read_geo
 from .surf import read_surf
 from .up import read_up
@@ -10,6 +10,8 @@ from .inp import read_inp
 __all__ = [
     "CalmetDataset",
     "read_calmet_dat",
+    "write_calmet_dat",
+    "write_calmet_netcdf",
     "read_geo",
     "read_surf",
     "read_up",
