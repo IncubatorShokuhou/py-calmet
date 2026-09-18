@@ -326,9 +326,7 @@ class CalmetConfig:
 
     def check_unsupported(self) -> None:
         """Raise NotImplementedError for switches that would silently wrong-result."""
-        # IGFMET: wired via io.igf (prior CALMET.DAT); no longer a hard stop
-        if abs(int(self.imixh)) == 2:
-            raise NotImplementedError('IMIXH=±2 (Batchvarova–Gryning) is not implemented')
+        # IGFMET: wired via io.igf; IMIXH=±2 Batchvarova–Gryning via pbl.mixht_day_bg
         # MM4DAT: out of scope — reject non-default MM4/MM5 filenames
         mm4 = str(self.mm4dat or "").strip().lower()
         if mm4 and mm4 not in {"mm4.dat", "mm5.dat", ""}:

@@ -226,16 +226,16 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `XEBAR` | real (length NBAR) | Y | **Implemented** | `winds.xebar` | Barrier end X (km). |
 | `YEBAR` | real (length NBAR) | Y | **Implemented** | `winds.yebar` | Barrier end Y (km). |
 | `KBAR` | integer | Y | **Implemented** | `winds.kbar` | Top layer (1-based) for barrier blocking in OA. |
-| `IDIOPT1` | integer | Y | **Implemented** | `winds.idiopt1` | Diag option switch read; recorded on meta / METLST. |
-| `IDIOPT2` | integer | Y | **Implemented** | `winds.idiopt2` | Diag option switch read; recorded on meta / METLST. |
-| `IDIOPT3` | integer | Y | **Implemented** | `winds.idiopt3` | Diag option switch read; recorded on meta / METLST. |
+| `IDIOPT1` | integer | Y | **Implemented** | `winds.idiopt1` | Surface T source for diag winds (0=obs; 1=preprocessed QA-note). |
+| `IDIOPT2` | integer | Y | **Implemented** | `winds.idiopt2` | Lapse via CGAMMA(ZUPT) → Froude/TOPOF2 when 0. |
+| `IDIOPT3` | integer | Y | **Implemented** | `winds.idiopt3` | Domain-avg UV via IUPWND/ZUPWND when 0. |
 | `IDIOPT4` | integer | Y | **Implemented** | `winds.idiopt4` | Diag option switch read; recorded on meta / METLST. |
 | `IDIOPT5` | integer | Y | **Implemented** | `winds.idiopt5` | Diag option switch read; recorded on meta / METLST. |
 | `ISURFT` | integer | Y | **Implemented** | `winds.isurft` | 1-based SS* index for OA / representative station. |
 | `IUPT` | integer | Y | **Implemented** | `winds.iupt` | 1-based upper-air station index (single-file path selects sounding). |
-| `ZUPT` | real | Y | **Implemented** | `winds.zupt` | Upper T reference height read; recorded on meta. |
-| `IUPWND` | integer | Y | **Implemented** | `winds.iupwnd` | Upper wind station index read; recorded on meta. |
-| `ZUPWND` | real (length 2) | Y | **Implemented** | `winds.zupwnd` | Upper wind height range read; recorded on meta. |
+| `ZUPT` | real | Y | **Implemented** | `winds.zupt` | CGAMMA layer depth (m) for diagnostic lapse. |
+| `IUPWND` | integer | Y | **Implemented** | `winds.iupwnd` | UA station for domain-avg UV (VERTAV-style). |
+| `ZUPWND` | real (length 2) | Y | **Implemented** | `winds.zupwnd` | [zlo,zhi] AGL for domain-avg UV when IDIOPT3=0. |
 | `LLBREZE` | logical | Y | **Implemented** | `winds.llbreze` | Lake-breeze surface blend inside NBOX influence boxes. |
 | `NBOX` | integer | Y | **Implemented** | `winds.nbox` | Number of lake-breeze boxes. |
 | `XG1` | real (length NBOX) | Y | **Implemented** | `winds.xg1` | Lake-breeze box X min (km). |
@@ -292,7 +292,7 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `HC1` | real |  | **Implemented** | `radiation.hc1` | Bound into heat_flux_energy_budget from CalmetConfig. |
 | `HC2` | real |  | **Implemented** | `radiation.hc2` | Bound into heat_flux_energy_budget from CalmetConfig. |
 | `HC3` | real |  | **Implemented** | `radiation.hc3` | Bound into heat_flux_energy_budget from CalmetConfig. |
-| `IMIXH` | integer | Y | **Implemented** | `pbl.imixh` | ±1 Maul–Carson (wired); ±3 Holzworth intercept; ±2 still NotImplemented. |
+| `IMIXH` | integer | Y | **Implemented** | `pbl.imixh` | ±1 Maul–Carson; ±2 Batchvarova–Gryning (mixht_day_bg); ±3 Holzworth. |
 | `THRESHL` | real | Y | **Implemented** | `pbl.threshl` | Daytime MIXHMC growth threshold. |
 | `THRESHW` | real | Y | **Implemented** | `pbl.threshw` | Overwater convective boost hook in mixht_overwater. |
 | `ICOARE` | integer | Y | **Implemented** | `overwater.icoare` | COARE-lite bulk fluxes over water when ICOARE≠0 and NOWSTA>0. |

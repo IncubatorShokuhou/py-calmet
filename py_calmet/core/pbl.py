@@ -306,3 +306,209 @@ def heat_flux_energy_budget(
         qh_day = bo * (qstar * (1.0 - hg) + qa) / (1.0 + bo)
         qh = np.where(day, qh_day, qh)
     return qh
+
+
+# ---------------------------------------------------------------------------
+# Batchvarova–Gryning convective mixing height (CALMET MIXHBG / FBG)
+# ---------------------------------------------------------------------------
+# Constants from Fortran MIXHBG (Batchvarova & Gryning 1991, 1994):
+_BG_CA = 0.2
+_BG_CB = 2.5
+_BG_CC = 8.0
+
+
+def _fbg(zeta: float, zetap: float, r1: float, r2: float, r3: float) -> float:
+    """Analytical antiderivative used by the MIXHBG false-images solver."""
+    return float(zeta * zeta + r1 * zeta + r2 * np.log(zeta) + r3 * np.log(zetap))
+
+
+def _mixhbg_scalar(
+    wt: float,
+    gamma: float,
+    tk: float,
+    ustar: float,
+    el: float,
+    zic_old: float,
+    *,
+    thresh: float = 0.05,
+    dt_sec: float = 3600.0,
+    zimin: float = 50.0,
+    zimax: float = 3000.0,
+    dptmin: float = 0.001,
+    izicrlx: int = 1,
+    tzicrlx: float = 800.0,
+    rho: float = 1.2,
+) -> float:
+    """Single-cell Batchvarova–Gryning convective Zi (m).
+
+    Feature-parity port of CALMET ``MIXHBG`` (analytical false-images
+    integration + secant refinement). Not bit-identical.
+    """
+    rho = max(float(rho), 0.5)
+    h0 = max(float(zic_old), float(zimin))
+    gamma = max(float(gamma), max(float(dptmin), 1e-4))
+    wt = float(wt)
+    el = float(el)
+    ustar = max(float(ustar), 0.01)
+    tk = max(float(tk), 200.0)
+    thresh = max(float(thresh), 1e-9)
+    dt = float(dt_sec)
+    tau = max(float(tzicrlx), 1.0)
+
+    wto = thresh * h0 / (rho * CP)
+    wptp = wt - wto
+
+    if int(izicrlx) == 0:
+        if el > 0.0 or wptp < 0.0:
+            return 0.0
+        if wptp == 0.0:
+            return float(zic_old)
+    else:
+        if el > 0.0 or wt < 0.0:
+            return 0.0
+        if wptp <= 0.0:
+            ziceq = rho * CP * wt / thresh
+            return float(ziceq + (h0 - ziceq) * np.exp(-dt / tau))
+
+    a = wptp / gamma
+    b = _BG_CC * ustar * ustar * tk / (gamma * G)
+    c = _BG_CB * VK * el  # negative under unstable
+    d = 1.0 + _BG_CA + _BG_CA  # 1.4
+    e = 1.0 + _BG_CA           # 1.2
+    d3 = d * d * d
+
+    zeta0 = d * h0 - 2.0 * c
+    zetap0 = e * h0 - c
+    r1 = 8.0 * c
+    r2 = r1 * c
+    r3 = 2.0 * b * d3 / e
+    r4 = 1.0 / (2.0 * a * d3) if abs(a) > 1e-30 else 0.0
+    r5 = e / d
+
+    # Guard non-positive log args at t0
+    if zeta0 <= 0.0 or zetap0 <= 0.0:
+        # Encroachment fallback
+        h = float(np.sqrt(max(h0 * h0 + 2.0 * d * a * dt, 0.0)))
+        return float(np.clip(h, zimin, zimax))
+
+    t0 = r4 * _fbg(zeta0, zetap0, r1, r2, r3)
+    time = dt + t0
+
+    if el > -500.0:
+        h = float(np.sqrt(max(h0 * h0 + 2.0 * d * a * dt, 0.0)))
+    else:
+        cube = h0 ** 3 - 6.0 * a * c * dt
+        h = float(np.sign(cube) * abs(cube) ** (1.0 / 3.0)) if cube != 0 else 0.0
+
+    zeta1 = d * h - 2.0 * c
+    zetap1 = e * h - c
+    if zeta1 <= 0.0 or zetap1 <= 0.0:
+        return float(np.clip(h, zimin, zimax))
+    f1 = r4 * _fbg(zeta1, zetap1, r1, r2, r3) - time
+    h = (zeta1 + 2.0 * c) / d
+    if abs(f1) <= 1.0:
+        return float(np.clip(h, zimin, zimax))
+
+    f0 = -dt
+    denom = f1 - f0
+    if abs(denom) < 1e-30:
+        return float(np.clip(h, zimin, zimax))
+    zeta2 = (f1 * zeta0 - f0 * zeta1) / denom
+    zetap2 = r5 * (zeta2 + 2.0 * c) - c
+    if zeta2 <= 0.0 or zetap2 <= 0.0:
+        zeta2 = 0.5 * (zeta0 + zeta1)
+        zetap2 = r5 * (zeta2 + 2.0 * c) - c
+    if zeta2 <= 0.0 or zetap2 <= 0.0:
+        return float(np.clip(h, zimin, zimax))
+    f2 = r4 * _fbg(zeta2, zetap2, r1, r2, r3) - time
+    h = (zeta2 + 2.0 * c) / d
+    if abs(f2) <= 1.0:
+        return float(np.clip(h, zimin, zimax))
+
+    for _ in range(10):
+        if abs(f1 - f2) <= 1e-10:
+            break
+        zeta3 = (f1 * zeta2 - f2 * zeta1) / (f1 - f2)
+        zetap3 = r5 * (zeta3 + 2.0 * c) - c
+        if zeta3 <= 0.0 or zetap3 <= 0.0:
+            h = ((zeta1 + zeta2) * 0.5 + 2.0 * c) / d
+            break
+        f3 = r4 * _fbg(zeta3, zetap3, r1, r2, r3) - time
+        h = (zeta3 + 2.0 * c) / d
+        zeta1, zetap1, f1 = zeta2, zetap2, f2
+        zeta2, zetap2, f2 = zeta3, zetap3, f3
+        if abs(f3) <= 1.0:
+            break
+    else:
+        h = ((zeta1 + zeta2) * 0.5 + 2.0 * c) / d
+
+    return float(np.clip(h, zimin, zimax))
+
+
+def mixht_day_bg(
+    qh: np.ndarray,
+    rho: np.ndarray,
+    tempk: np.ndarray,
+    ustar: np.ndarray,
+    el: np.ndarray,
+    fcori: float | np.ndarray,
+    dt_sec: float = 3600.0,
+    ziconv_prev: np.ndarray | None = None,
+    dtheta: float | np.ndarray = 0.001,
+    threshl: float = 0.05,
+    constb: float = 1.41,
+    zimin: float = 50.0,
+    zimax: float = 3000.0,
+    *,
+    izicrlx: int = 1,
+    tzicrlx: float = 800.0,
+    dptmin: float = 0.001,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Daytime mixing height: Batchvarova–Gryning convective + mechanical.
+
+    Returns ``(zi, ziconv, dptt_dummy)`` — ``dptt`` is unused by MIXHBG and
+    returned as zeros for API compatibility with ``mixht_day_carson``.
+    """
+    qh = np.asarray(qh, dtype=np.float64)
+    rho_a = np.maximum(np.asarray(rho, dtype=np.float64), 0.5)
+    tempk = np.asarray(tempk, dtype=np.float64)
+    ustar = np.asarray(ustar, dtype=np.float64)
+    el = np.asarray(el, dtype=np.float64)
+    wt = qh / (rho_a * CP)
+    htold = (
+        np.zeros_like(qh)
+        if ziconv_prev is None
+        else np.asarray(ziconv_prev, dtype=np.float64).copy()
+    )
+    gamma = np.asarray(dtheta, dtype=np.float64)
+    if gamma.ndim == 0:
+        gamma = np.full(qh.shape, max(float(gamma), float(dptmin), 1e-4))
+    else:
+        gamma = np.maximum(gamma, max(float(dptmin), 1e-4))
+
+    ziconv = np.zeros_like(qh)
+    flat_idx = np.ndindex(qh.shape)
+    for idx in flat_idx:
+        ziconv[idx] = _mixhbg_scalar(
+            float(wt[idx]),
+            float(gamma[idx]),
+            float(tempk[idx]),
+            float(ustar[idx]),
+            float(el[idx]),
+            float(htold[idx]),
+            thresh=threshl,
+            dt_sec=dt_sec,
+            zimin=zimin,
+            zimax=zimax,
+            dptmin=dptmin,
+            izicrlx=izicrlx,
+            tzicrlx=tzicrlx,
+            rho=float(rho_a[idx]),
+        )
+
+    cmech = constb / np.sqrt(np.maximum(np.asarray(fcori, dtype=np.float64), 1e-5))
+    hmech = np.minimum(cmech * ustar, zimax)
+    zi = np.maximum(np.maximum(zimin, hmech), ziconv)
+    zi = np.minimum(zi, zimax)
+    dptt = np.zeros_like(qh)
+    return zi, ziconv, dptt

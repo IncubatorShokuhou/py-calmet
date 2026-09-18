@@ -19,7 +19,7 @@ from ..io.pacout import write_pacout, mixed_layer_uv
 from .met_utils import layer_mids, coriolis, utm_to_latlon
 from . import winds, pbl, clouds, precip, overwater, mixdt, barriers as barriers_mod
 from .coord import MapProjection, domain_center_latlon
-from . import run_options, zi_ops
+from . import run_options, zi_ops, diag_opts
 from ..io import igf as igf_mod
 
 
@@ -347,6 +347,14 @@ def run_calmet(
     zupt = inp.get_float("ZUPT", 200.0)
     iupwnd = inp.get_int("IUPWND", -1)
     zupwnd = inp.get_list_float("ZUPWND") or [1.0, 1000.0]
+    qa_notes.extend(
+        diag_opts.qa_idiopt(
+            [idiopt1, idiopt2, idiopt3, idiopt4, idiopt5], irtype=irtype
+        )
+    )
+    um_domain = 0.0
+    vm_domain = 0.0
+    gamma_diag_last = None
     alpha = inp.get_float("ALPHA", 0.1)
     niter = inp.get_int("NITER", 50)
     threshl = inp.get_float("THRESHL", 0.05)
@@ -648,19 +656,59 @@ def run_calmet(
             pass
         elif False:
             pass
+        # Diagnostic CGAMMA / domain-avg UA wind (IDIOPT2/3, ZUPT, IUPWND, ZUPWND)
+        snd_z_diag = snd_t_diag = None
+        if up is not None and int(idiopt2) == 0:
+            try:
+                sounding_d = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
+                stn_elev_d = float(np.min(elev))
+                snd_z_diag = np.array(
+                    [lev.height - stn_elev_d for lev in sounding_d.levels], dtype=np.float64
+                )
+                snd_t_diag = np.array(
+                    [lev.temp_c + 273.15 for lev in sounding_d.levels], dtype=np.float64
+                )
+            except Exception:
+                snd_z_diag = snd_t_diag = None
+        gamma, gnote = diag_opts.resolve_diag_gamma(
+            idiopt2=idiopt2,
+            zupt=zupt,
+            ziconv_mean=float(np.nanmean(ziconv_prev)),
+            sounding_z=snd_z_diag,
+            sounding_t=snd_t_diag,
+            temp_sfc=float(np.nanmean(temp2d)),
+            daytime=daytime,
+        )
+        gamma_diag_last = gamma
+        if h == 0 and gnote:
+            qa_notes.append(gnote)
+        if up is not None and int(idiopt3) == 0:
+            try:
+                sounding_w = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
+                stn_elev_w = float(np.min(elev))
+                zlo = float(zupwnd[0]) if zupwnd else 1.0
+                zhi = float(zupwnd[1]) if len(zupwnd) > 1 else 1000.0
+                um_domain, vm_domain = diag_opts.domain_avg_wind_from_sounding(
+                    sounding_w.levels, zlo=zlo, zhi=zhi, stn_elev=stn_elev_w
+                )
+                if h == 0:
+                    qa_notes.append(
+                        f"IUPWND={iupwnd} ZUPWND=[{zlo:g},{zhi:g}] "
+                        f"domain UV=({um_domain:.2f},{vm_domain:.2f})"
+                    )
+            except Exception:
+                pass
+
         # 1) Froude blocking (IFRADJ)
         if int(iwfcod) != 0 and ifradj == 1:
-            # stable lapse proxy ~0.01 K/m when night; weaker by day
-            gamma = 0.01 if not daytime else 0.005
             U, V = winds.froude_adjust(
                 U, V, elev, zface, temp2d, dgrid_m, gamma=gamma, critfn=critfn, terrad_km=terrad
             )
         # 2) Kinematic TOPOF2 W + optional minim (IKINE); O'Brien after smooth
         W_topo = None
         if int(iwfcod) != 0 and ikine == 1:
-            gamma_k = 0.01 if not daytime else 0.005
             W_topo = winds.topographic_kinematic_w(
-                U, V, elev, zface, temp2d, dgrid_m, alpha=alpha, gamma=gamma_k
+                U, V, elev, zface, temp2d, dgrid_m, alpha=alpha, gamma=gamma
             )
             U, V = winds.divergence_minimize(
                 U, V, dgrid_m, niter=min(niter, 30), divlim=divlim, W=W_topo, zface=zface
@@ -761,22 +809,45 @@ def run_calmet(
                 height_agl_3d=hag_3d,
                 tempk_3d=t3d,
             )
-            zi_d, ziconv, dptt_prev = pbl.mixht_day_carson(
-                np.where(day_cell, qh, 0.0),
-                rho,
-                temp2d,
-                ustar,
-                fcori,
-                dt_sec=float(nsecdt),
-                ziconv_prev=ziconv_prev,
-                dptt_prev=dptt_prev,
-                threshl=threshl,
-                constb=constb,
-                conste=conste,
-                dtheta=gamma_zi,
-                zimin=zimin,
-                zimax=zimax,
-            )
+            qh_day = np.where(day_cell, qh, 0.0)
+            if abs(int(imixh)) == 2:
+                # Batchvarova–Gryning (MIXHBG)
+                zi_d, ziconv, dptt_prev = pbl.mixht_day_bg(
+                    qh_day,
+                    rho,
+                    temp2d,
+                    ustar,
+                    el,
+                    fcori,
+                    dt_sec=float(nsecdt),
+                    ziconv_prev=ziconv_prev,
+                    threshl=threshl,
+                    constb=constb,
+                    dtheta=gamma_zi,
+                    zimin=zimin,
+                    zimax=zimax,
+                    izicrlx=izicrlx,
+                    tzicrlx=tzicrlx,
+                    dptmin=dptmin,
+                )
+            else:
+                # Default / IMIXH=±1: Maul–Carson (MIXHMC)
+                zi_d, ziconv, dptt_prev = pbl.mixht_day_carson(
+                    qh_day,
+                    rho,
+                    temp2d,
+                    ustar,
+                    fcori,
+                    dt_sec=float(nsecdt),
+                    ziconv_prev=ziconv_prev,
+                    dptt_prev=dptt_prev,
+                    threshl=threshl,
+                    constb=constb,
+                    conste=conste,
+                    dtheta=gamma_zi,
+                    zimin=zimin,
+                    zimax=zimax,
+                )
             zi_n = pbl.mixht_night(ustar, el, fcori, constn, zimin, zimax)
             zi = np.where(day_cell, zi_d, zi_n)
             # IMIXH=±3: Holzworth dry-adiabatic intercept (land convective)
@@ -960,6 +1031,13 @@ def run_calmet(
             "mreg": mreg,
             "iforms": iforms,
             "nflagp": nflagp,
+            "imixh": imixh,
+            **diag_opts.diag_meta_dict(
+                idiopt1=idiopt1, idiopt2=idiopt2, idiopt3=idiopt3,
+                idiopt4=idiopt4, idiopt5=idiopt5,
+                zupt=zupt, iupwnd=iupwnd, zupwnd=zupwnd,
+                um=um_domain, vm=vm_domain, gamma_diag=gamma_diag_last,
+            ),
         },
     )
 
@@ -995,6 +1073,14 @@ def run_calmet(
                     "IRHPROG": irhprog,
                     "IAVEZI": iavezi,
                     "IMIXH": imixh,
+                    "IDIOPT1": idiopt1,
+                    "IDIOPT2": idiopt2,
+                    "IDIOPT3": idiopt3,
+                    "ZUPT": zupt,
+                    "IUPWND": iupwnd,
+                    "ZUPWND": zupwnd,
+                    "UM_DOMAIN": um_domain,
+                    "VM_DOMAIN": vm_domain,
                     "IGFMET": igfmet,
                     "LCALGRD": lcalgrd,
                     "IRTYPE": irtype,

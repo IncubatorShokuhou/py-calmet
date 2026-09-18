@@ -11,6 +11,7 @@ from .precip_dat import read_precip, PrecipData
 from .cloud_dat import read_cloud, write_cloud, CloudData
 from .metlst import write_metlst
 from .pacout import write_pacout, mixed_layer_uv
+from .wrfout import open_wrfout, wrfout_summary  # optional xarray
 
 __all__ = [
     "CalmetDataset",
@@ -34,5 +35,7 @@ __all__ = [
     "CloudData",
     "write_metlst",
     "write_pacout",
+    "open_wrfout",
+    "wrfout_summary",
     "mixed_layer_uv",
 ]

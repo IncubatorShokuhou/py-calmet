@@ -2,8 +2,11 @@
 """Convert a WRF wrfout NetCDF file to CALMET 3D.DAT (dataset 2.1, IOUTMM5=92).
 
 Reads U/V/T/P/PB/PH/PHB/QVAPOR/HGT/LU_INDEX/U10/V10/T2/Q2/PSFC/SWDOWN/GLW
-with netCDF4, destaggers winds, builds hydrostatic heights, and writes the
-text 3D.DAT format used by hrrr2calmet / tiny-domain goldens.
+with netCDF4 (default) or xarray when available — see also
+``py_calmet.io.wrfout`` for metadata / wrf-python destagger helpers.
+MM4/MM5.DAT are out of scope; wrfout is the supported prognostic path.
+Destaggers winds, builds hydrostatic heights, and writes the text 3D.DAT
+format used by hrrr2calmet / tiny-domain goldens.
 """
 from __future__ import annotations
 

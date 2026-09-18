@@ -3124,7 +3124,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Implemented",
-      "notes": "\u00b11 Maul\u2013Carson (wired); \u00b13 Holzworth intercept; \u00b12 still NotImplemented.",
+      "notes": "\u00b11 Maul\u2013Carson; \u00b12 Batchvarova\u2013Gryning (mixht_day_bg); \u00b13 Holzworth.",
       "api_field": "pbl.imixh"
     },
     {
