@@ -328,12 +328,9 @@ class CalmetConfig:
         """Raise NotImplementedError for switches that would silently wrong-result."""
         if int(self.igfmet) != 0:
             raise NotImplementedError('IGFMET!=0 (IGF first-guess) is not implemented')
-        if bool(self.llbreze):
-            raise NotImplementedError('LLBREZE=T (lake breeze) is not implemented')
         if abs(int(self.imixh)) == 2:
             raise NotImplementedError('IMIXH=±2 (Batchvarova–Gryning) is not implemented')
-        if int(self.nbar) > 0:
-            raise NotImplementedError('NBAR>0 (wind barriers) is not implemented')
+        # LLBREZE / NBAR: implemented in core.barriers (wired by runner when set)
 
 
 PARAM_NAMES: tuple[str, ...] = tuple(

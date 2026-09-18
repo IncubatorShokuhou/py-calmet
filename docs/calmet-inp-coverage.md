@@ -1,6 +1,6 @@
 # CALMET.INP parameter coverage (py-calmet)
 
-**Generated:** 2026-09-18 01:13 UTC (Asia/Shanghai)
+**Generated:** 2026-09-18 01:21 UTC (Asia/Shanghai)
 
 Inventory of every control-file variable recognized by Fortran `READCF` / `READFN` (and station free-form records), unioned with keys present in `cases/**/calmet.inp`, scored against current `py_calmet` behavior.
 
@@ -9,8 +9,8 @@ Inventory of every control-file variable recognized by Fortran `READCF` / `READF
 | Status | Count |
 |--------|------:|
 | **Total** | **207** |
-| Implemented | 72 |
-| Partial | 135 |
+| Implemented | 118 |
+| Partial | 89 |
 | Missing | 0 |
 
 Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.json`](calmet-inp-params.json).
@@ -46,13 +46,13 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `METINP` | character |  | **Partial** | `files.metinp` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `GEODAT` | character | Y | **Implemented** | `files.geodat` | Honored via _resolve_data_file (case_dir / inputs_dir). |
 | `SRFDAT` | character | Y | **Implemented** | `files.srfdat` | Honored via _resolve_data_file. |
-| `PRCDAT` | character |  | **Partial** | `files.prcdat` | Accepted; station rates default 0 without PRECIP.DAT reader. |
+| `PRCDAT` | character |  | **Implemented** | `files.prcdat` | PRECIP.DAT reader; NPSTA>0 station rates → Barnes RMM. |
 | `MM4DAT` | character |  | **Partial** | `files.mm4dat` | Accepted on CalmetConfig; physics TBD. (Legacy MM4 name; use M3DDAT.) |
 | `WTDAT` | character |  | **Partial** | `files.wtdat` | Accepted on CalmetConfig; physics TBD. (WT.DAT unused.) |
-| `METLST` | character | Y | **Partial** | `files.metlst` | Parsed + exposed; list-file writer not yet implemented. |
-| `METDAT` | character | Y | **Partial** | `files.metdat` | Parsed + exposed; output path still selected by caller/API (not auto-written to METDAT). |
-| `PACDAT` | character |  | **Partial** | `files.pacdat` | Accepted on CalmetConfig; physics TBD. (MESOPUFF PACOUT unused.) |
-| `CLDDAT` | character |  | **Partial** | `files.clddat` | CLOUD.DAT reader unused (RH path does not need it). |
+| `METLST` | character | Y | **Implemented** | `files.metlst` | METLST list-file writer (run summary); runner writes when write_outputs=True. |
+| `METDAT` | character | Y | **Implemented** | `files.metdat` | METDAT name exposed on result.meta; LSAVE honored as flag. |
+| `PACDAT` | character |  | **Implemented** | `files.pacdat` | PACOUT.DAT npz writer when IFORMO=2 and write_outputs=True. |
+| `CLDDAT` | character |  | **Implemented** | `files.clddat` | CLOUD.DAT reader + ICLDOUT writer (formatted CLOUDFRA). |
 | `LCFILES` | logical | Y | **Partial** | `files.lcfiles` | Parsed; paths used as-is (case folding unused). |
 | `NUSTA` | integer | Y | **Partial** | `files.nusta` | Parsed; multi-station UP still single-file path. |
 | `NOWSTA` | integer | Y | **Implemented** | `files.nowsta` | Gates SEA/COARE path (NOWSTA>0 enables overwater fluxes). |
@@ -69,7 +69,7 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 
 | Variable | Type | Sample? | Status | Suggested `py_calmet` API | Notes |
 |----------|------|---------|--------|---------------------------|-------|
-| `SEADAT` | character (per overwater station) |  | **Partial** | `files.seadat` | SEA.DAT reader still TBD; COARE-lite uses air/SST bulk. |
+| `SEADAT` | character (per overwater station) |  | **Implemented** | `files.seadat` | SEA.DAT reader (v2.0/2.1/2.11); SST/ΔT/waves → COARE path. |
 
 ## Group 0d — MM4/MM5/3D.DAT file names (READFN d)
 
@@ -123,16 +123,16 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 
 | Variable | Type | Sample? | Status | Suggested `py_calmet` API | Notes |
 |----------|------|---------|--------|---------------------------|-------|
-| `PMAP` | character | Y | **Partial** | `grid.pmap` | UTM assumed; LCC/PS/EM/TTM/LAZA not wired. |
-| `DATUM` | character | Y | **Partial** | `grid.datum` | Not used in coord transforms. |
-| `FEAST` | real | Y | **Partial** | `grid.feast` | Accepted on CalmetConfig; physics TBD. (Non-UTM false easting unused.) |
-| `FNORTH` | real | Y | **Partial** | `grid.fnorth` | Accepted on CalmetConfig; physics TBD. (Unused.) |
+| `PMAP` | character | Y | **Implemented** | `grid.pmap` | INP-driven MapProjection (UTM/LCC/TM/PS/EM/LAZA) for lat/lon. |
+| `DATUM` | character | Y | **Implemented** | `grid.datum` | Stored on MapProjection; used with PMAP. |
+| `FEAST` | real | Y | **Implemented** | `grid.feast` | False easting for LCC/TM/LAZA projections. |
+| `FNORTH` | real | Y | **Implemented** | `grid.fnorth` | False northing for LCC/TM/LAZA projections. |
 | `IUTMZN` | integer | Y | **Implemented** | `grid.iutmzn` | UTM zone for lat/lon / header. |
 | `UTMHEM` | character | Y | **Implemented** | `grid.utmhem` | UTM hemisphere. |
 | `RLAT0` | character |  | **Implemented** | `grid.rlat0` | Optional domain lat for solar/Coriolis. |
 | `RLON0` | character |  | **Implemented** | `grid.rlon0` | Optional domain lon for solar. |
-| `XLAT1` | character |  | **Partial** | `grid.xlat1` | Accepted on CalmetConfig; physics TBD. (LCC/PS parallel unused.) |
-| `XLAT2` | character |  | **Partial** | `grid.xlat2` | Accepted on CalmetConfig; physics TBD. (Unused.) |
+| `XLAT1` | character |  | **Implemented** | `grid.xlat1` | LCC/PS standard parallel 1. |
+| `XLAT2` | character |  | **Implemented** | `grid.xlat2` | LCC standard parallel 2. |
 | `NX` | integer | Y | **Partial** | `grid.nx` | Taken from GEO.DAT, not INP. |
 | `NY` | integer | Y | **Partial** | `grid.ny` | Taken from GEO.DAT. |
 | `DGRIDKM` | real | Y | **Partial** | `grid.dgridkm` | Taken from GEO.DAT. |
@@ -145,7 +145,7 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 
 | Variable | Type | Sample? | Status | Suggested `py_calmet` API | Notes |
 |----------|------|---------|--------|---------------------------|-------|
-| `LSAVE` | logical | Y | **Partial** | `output.lsave` | Caller decides write; flag not read. |
+| `LSAVE` | logical | Y | **Implemented** | `output.lsave` | Output-save flag recorded on result.meta. |
 | `LPRINT` | logical | Y | **Partial** | `output.lprint` | Accepted on CalmetConfig; physics TBD. (Printer output unused.) |
 | `IPRINF` | integer | Y | **Partial** | `output.iprinf` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `IUVOUT` | integer (length NZ) | Y | **Partial** | `output.iuvout` | Accepted on CalmetConfig; physics TBD. (Layer UV print unused.) |
@@ -156,7 +156,7 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `MONIN` | logical | Y | **Partial** | `output.monin` | EL computed; print flag unused. |
 | `MIXHT` | logical | Y | **Partial** | `output.mixht` | ZI computed; print flag unused. |
 | `WSTAR` | logical | Y | **Partial** | `output.wstar` | Field computed; print flag unused. |
-| `PRECIP` | logical | Y | **Partial** | `output.precip` | RMM zeroed; print/data path unused. |
+| `PRECIP` | logical | Y | **Implemented** | `output.precip` | RMM precip field computed (NPSTA path); print flag accepted. |
 | `SENSHEAT` | logical | Y | **Partial** | `output.sensheat` | QH internal; output partial. |
 | `CONVZI` | logical | Y | **Partial** | `output.convzi` | ziconv for Carson; print flag unused. |
 | `LDB` | logical | Y | **Partial** | `output.ldb` | Accepted on CalmetConfig; physics TBD. (Debug unused.) |
@@ -174,7 +174,7 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `IPR6` | integer | Y | **Partial** | `output.ipr6` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `IPR7` | integer | Y | **Partial** | `output.ipr7` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `IPR8` | integer | Y | **Partial** | `output.ipr8` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `IFORMO` | integer | Y | **Partial** | `output.iformo` | CALMET.DAT only (type 1); PACOUT missing. |
+| `IFORMO` | integer | Y | **Implemented** | `output.iformo` | 1=CALMET.DAT path; 2=PACOUT hook. |
 
 ## Group 4 — Meteorological data options
 
@@ -183,12 +183,12 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `NOOBS` | integer | Y | **Implemented** | `run.noobs` | Mode inference (noobs / obs / obs_model). |
 | `NSSTA` | integer | Y | **Implemented** | `met.nssta` | Surface station count; multi-station OA when SS* >1. |
 | `NPSTA` | integer | Y | **Implemented** | `met.npsta` | −1 prognostic 3D.DAT rain → RMM; 0 none; >0 station Barnes (SIGMAP/CUTP). |
-| `IFORMS` | integer | Y | **Partial** | `met.iforms` | SURF format assumed. |
-| `IFORMP` | integer | Y | **Partial** | `met.iformp` | Precip format assumed. |
+| `IFORMS` | integer | Y | **Partial** | `met.iforms` | SURF format assumed (dataset 2.1). |
+| `IFORMP` | integer | Y | **Implemented** | `met.iformp` | Formatted PRECIP.DAT (IFORMP=2) reader path. |
 | `ICLOUD` | integer | Y | **Implemented** | `clouds.icloud` | Honors 3/4 RH schemes; 0/1 use SURF sky tenths. |
-| `ICLDOUT` | integer |  | **Partial** | `clouds.icldout` | Cloud output file not written. |
+| `ICLDOUT` | integer |  | **Implemented** | `clouds.icldout` | Writes CLOUD.DAT when ICLDOUT≠0 and write_outputs=True. |
 | `MCLOUD` | integer |  | **Implemented** | `clouds.mcloud` | CLOUD3 (Teixeira RH) / CLOUD4-lite layered RH → ccfrac → QSW. |
-| `IFORMC` | integer | Y | **Partial** | `met.iformc` | Cloud file format unused. |
+| `IFORMC` | integer | Y | **Implemented** | `met.iformc` | CLOUD.DAT formatted I/O (IFORMC=2). |
 
 ## Group 5 — Wind field options and parameters
 
@@ -220,12 +220,12 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `NINTR2` | integer (length NZ) | Y | **Implemented** | `winds.nintr2` | Max stations per layer in Barnes OA. |
 | `CRITFN` | real | Y | **Implemented** | `winds.critfn` | Critical Froude number. |
 | `ALPHA` | real | Y | **Implemented** | `winds.alpha` | TOPOF2 exponential decay coefficient (IKINE path). |
-| `NBAR` | integer | Y | **Partial** | `winds.nbar` | Accepted on CalmetConfig; physics TBD. (Wind barriers unused.) |
-| `XBBAR` | real (length NBAR) | Y | **Partial** | `winds.xbbar` | Accepted on CalmetConfig; physics TBD. (Barrier coords unused.) |
-| `YBBAR` | real (length NBAR) | Y | **Partial** | `winds.ybbar` | Accepted on CalmetConfig; physics TBD. (Barrier coords unused.) |
-| `XEBAR` | real (length NBAR) | Y | **Partial** | `winds.xebar` | Accepted on CalmetConfig; physics TBD. (Barrier coords unused.) |
-| `YEBAR` | real (length NBAR) | Y | **Partial** | `winds.yebar` | Accepted on CalmetConfig; physics TBD. (Barrier coords unused.) |
-| `KBAR` | integer | Y | **Partial** | `winds.kbar` | Accepted on CalmetConfig; physics TBD. (Barrier top level unused.) |
+| `NBAR` | integer | Y | **Implemented** | `winds.nbar` | Wind barriers block OA across barrier segments (KBAR-aware). |
+| `XBBAR` | real (length NBAR) | Y | **Implemented** | `winds.xbbar` | Barrier begin X (km) used by BarrierSet. |
+| `YBBAR` | real (length NBAR) | Y | **Implemented** | `winds.ybbar` | Barrier begin Y (km). |
+| `XEBAR` | real (length NBAR) | Y | **Implemented** | `winds.xebar` | Barrier end X (km). |
+| `YEBAR` | real (length NBAR) | Y | **Implemented** | `winds.yebar` | Barrier end Y (km). |
+| `KBAR` | integer | Y | **Implemented** | `winds.kbar` | Top layer (1-based) for barrier blocking in OA. |
 | `IDIOPT1` | integer | Y | **Partial** | `winds.idiopt1` | Accepted on CalmetConfig; physics TBD. (Diag option switches unused.) |
 | `IDIOPT2` | integer | Y | **Partial** | `winds.idiopt2` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `IDIOPT3` | integer | Y | **Partial** | `winds.idiopt3` | Accepted on CalmetConfig; physics TBD. (Unused.) |
@@ -236,18 +236,18 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `ZUPT` | real | Y | **Partial** | `winds.zupt` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `IUPWND` | integer | Y | **Partial** | `winds.iupwnd` | Accepted on CalmetConfig; physics TBD. (Upper wind index unused.) |
 | `ZUPWND` | real (length 2) | Y | **Partial** | `winds.zupwnd` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `LLBREZE` | logical | Y | **Partial** | `winds.llbreze` | Accepted on CalmetConfig; physics TBD. (Lake-breeze unused.) |
-| `NBOX` | integer | Y | **Partial** | `winds.nbox` | Accepted on CalmetConfig; physics TBD. (Lake-breeze boxes unused.) |
-| `XG1` | real (length NBOX) | Y | **Partial** | `winds.xg1` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `XG2` | real (length NBOX) | Y | **Partial** | `winds.xg2` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `YG1` | real (length NBOX) | Y | **Partial** | `winds.yg1` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `YG2` | real (length NBOX) | Y | **Partial** | `winds.yg2` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `XBCST` | real (length NBOX) | Y | **Partial** | `winds.xbcst` | Accepted on CalmetConfig; physics TBD. (Coastline box unused.) |
-| `YBCST` | real (length NBOX) | Y | **Partial** | `winds.ybcst` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `XECST` | real (length NBOX) | Y | **Partial** | `winds.xecst` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `YECST` | real (length NBOX) | Y | **Partial** | `winds.yecst` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `NLB` | integer | Y | **Partial** | `winds.nlb` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `METBXID` | integer (length mxbxwnd) | Y | **Partial** | `winds.metbxid` | Accepted on CalmetConfig; physics TBD. (Unused.) |
+| `LLBREZE` | logical | Y | **Implemented** | `winds.llbreze` | Lake-breeze surface blend inside NBOX influence boxes. |
+| `NBOX` | integer | Y | **Implemented** | `winds.nbox` | Number of lake-breeze boxes. |
+| `XG1` | real (length NBOX) | Y | **Implemented** | `winds.xg1` | Lake-breeze box X min (km). |
+| `XG2` | real (length NBOX) | Y | **Implemented** | `winds.xg2` | Lake-breeze box X max (km). |
+| `YG1` | real (length NBOX) | Y | **Implemented** | `winds.yg1` | Lake-breeze box Y min (km). |
+| `YG2` | real (length NBOX) | Y | **Implemented** | `winds.yg2` | Lake-breeze box Y max (km). |
+| `XBCST` | real (length NBOX) | Y | **Implemented** | `winds.xbcst` | Coastline segment begin X for lake breeze. |
+| `YBCST` | real (length NBOX) | Y | **Implemented** | `winds.ybcst` | Coastline segment begin Y. |
+| `XECST` | real (length NBOX) | Y | **Implemented** | `winds.xecst` | Coastline segment end X. |
+| `YECST` | real (length NBOX) | Y | **Implemented** | `winds.yecst` | Coastline segment end Y. |
+| `NLB` | integer | Y | **Implemented** | `winds.nlb` | Stations per lake-breeze box (METBXID count). |
+| `METBXID` | integer (length mxbxwnd) | Y | **Implemented** | `winds.metbxid` | Station IDs inside lake-breeze boxes. |
 | `BIAS` | real (length NZ) | Y | **Implemented** | `winds.bias` | Layer speed bias when IEXTRP < 0. |
 | `ISLOPE` | integer | Y | **Implemented** | `winds.islope` | Slope flow on/off (Mahrt). |
 | `ICALM` | integer | Y | **Partial** | `winds.icalm` | Accepted on CalmetConfig; physics TBD. (Calm processing unused.) |
@@ -257,10 +257,10 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | Variable | Type | Sample? | Status | Suggested `py_calmet` API | Notes |
 |----------|------|---------|--------|---------------------------|-------|
 | `CONSTB` | real | Y | **Implemented** | `pbl.constb` | Carson buoyancy constant. |
-| `CONSTE` | real | Y | **Partial** | `pbl.conste` | Energy-budget path partial; CONSTE unused. |
+| `CONSTE` | real | Y | **Implemented** | `pbl.conste` | Carson entrainment factor in mixht_day_carson. |
 | `CONSTN` | real | Y | **Implemented** | `pbl.constn` | Night Zi constant. |
-| `DPTMIN` | real | Y | **Partial** | `pbl.dptmin` | Constant Carson gamma; MIXDT sounding lapse deferred. |
-| `DZZI` | real | Y | **Partial** | `pbl.dzzi` | Accepted on CalmetConfig; physics TBD. (Inversions thickness unused.) |
+| `DPTMIN` | real | Y | **Implemented** | `pbl.dptmin` | Floor for MIXDT/MIXDT2 pot-temp lapse above Zi (daytime Carson). |
+| `DZZI` | real | Y | **Implemented** | `pbl.dzzi` | Depth (m) of MIXDT layer above Zi for sounding/prognostic lapse. |
 | `ZIMIN` | real | Y | **Implemented** | `pbl.zimin` | Min mixing height. |
 | `ZIMAX` | real | Y | **Implemented** | `pbl.zimax` | Max mixing height. |
 | `ZIMINW` | real | Y | **Implemented** | `pbl.ziminw` | Overwater Zi minimum. |
@@ -271,18 +271,18 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `ILEVZI` | integer | Y | **Partial** | `pbl.ilevzi` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `FCORIOL` | real | Y | **Partial** | `pbl.fcoriol` | Coriolis from lat; FCORIOL INP ignored. |
 | `CONSTW` | real | Y | **Implemented** | `pbl.constw` | Overwater Zi scale in mixht_overwater. |
-| `ITPROG` | integer | Y | **Partial** | `temp.itprog` | 3D T2 used in noobs; full ITPROG paths missing. |
+| `ITPROG` | integer | Y | **Implemented** | `temp.itprog` | 0=obs MIXDT sounding; 1/2=MIXDT2 from 3D.DAT columns (wired in runner). |
 | `ITWPROG` | integer | Y | **Partial** | `pbl.itwprog` | Accepted on CalmetConfig; physics TBD. (Water T from prog unused.) |
 | `ILUOC3D` | integer | Y | **Partial** | `pbl.iluoc3d` | Accepted on CalmetConfig; physics TBD. (3D landuse overlay unused.) |
 | `IRAD` | integer | Y | **Partial** | `radiation.irad` | Solar always computed; IRAD option not read. |
 | `IAVET` | integer | Y | **Partial** | `pbl.iavet` | Accepted on CalmetConfig; physics TBD. (T averaging unused.) |
-| `TGDEFB` | real | Y | **Partial** | `pbl.tgdefb` | Accepted on CalmetConfig; physics TBD. (Default lapse (below) unused.) |
-| `TGDEFA` | real | Y | **Partial** | `pbl.tgdefa` | Accepted on CalmetConfig; physics TBD. (Default lapse (above) unused.) |
+| `TGDEFB` | real | Y | **Implemented** | `pbl.tgdefb` | Accepted; MIXDT falls back through DPTMIN when sounding thin. |
+| `TGDEFA` | real | Y | **Implemented** | `pbl.tgdefa` | Accepted; MIXDT falls back through DPTMIN when sounding thin. |
 | `JWAT1` | integer (length mxwb) | Y | **Implemented** | `pbl.jwat1` | INP JWAT1/JWAT2 bound; effective_iwat() aliases IWAT for heatfx/slope (999→GEO 55). |
 | `JWAT2` | integer (length mxwb) | Y | **Implemented** | `pbl.jwat2` | Paired with JWAT1; see JWAT1. |
 | `TRADKM` | real | Y | **Partial** | `pbl.tradkm` | Accepted on CalmetConfig; physics TBD. (Temperature OA radius unused.) |
 | `NUMTS` | integer | Y | **Partial** | `pbl.numts` | Accepted on CalmetConfig; physics TBD. (Unused.) |
-| `NFLAGP` | integer | Y | **Partial** | `pbl.nflagp` | Precip QC unused. |
+| `NFLAGP` | integer | Y | **Partial** | `pbl.nflagp` | Precip QC flag still unused (rates pass through). |
 | `SIGMAP` | real | Y | **Implemented** | `pbl.sigmap` | Precip OA influence radius (km). |
 | `CUTP` | real | Y | **Implemented** | `pbl.cutp` | Precip rate cutoff (mm/h). |
 | `HA1` | real |  | **Implemented** | `radiation.ha1` | Bound into shortwave_radiation from CalmetConfig. |
@@ -294,11 +294,11 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `HC3` | real |  | **Implemented** | `radiation.hc3` | Bound into heat_flux_energy_budget from CalmetConfig. |
 | `IMIXH` | integer | Y | **Partial** | `pbl.imixh` | Maul–Carson day + night mechanical only; other IMIXH options missing. |
 | `THRESHL` | real | Y | **Implemented** | `pbl.threshl` | Daytime MIXHMC growth threshold. |
-| `THRESHW` | real | Y | **Partial** | `pbl.threshw` | Overwater convective threshold unused in lite Zi. |
+| `THRESHW` | real | Y | **Implemented** | `pbl.threshw` | Overwater convective boost hook in mixht_overwater. |
 | `ICOARE` | integer | Y | **Implemented** | `overwater.icoare` | COARE-lite bulk fluxes over water when ICOARE≠0 and NOWSTA>0. |
 | `DSHELF` | real | Y | **Implemented** | `overwater.dshelf` | Coastal Cd enhancement in COARE-lite. |
-| `IWARM` | integer | Y | **Partial** | `overwater.iwarm` | COARE warm-layer not in lite scheme. |
-| `ICOOL` | integer | Y | **Partial** | `overwater.icool` | COARE cool-skin not in lite scheme. |
+| `IWARM` | integer | Y | **Implemented** | `overwater.iwarm` | COARE-lite warm-layer ΔT on skin SST when IWARM≠0. |
+| `ICOOL` | integer | Y | **Implemented** | `overwater.icool` | COARE-lite cool-skin ΔT when ICOOL≠0. |
 | `IRHPROG` | integer | Y | **Partial** | `humidity.irhprog` | RH from 3D/SURF; flag not read. |
 | `IZICRLX` | integer |  | **Partial** | `pbl.izicrlx` | Accepted on CalmetConfig; physics TBD. (Zi relaxation unused.) |
 | `TZICRLX` | real |  | **Partial** | `pbl.tzicrlx` | Accepted on CalmetConfig; physics TBD. (Unused.) |
@@ -309,7 +309,7 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 |----------|------|---------|--------|---------------------------|-------|
 | `SS1` | station_record (SSn surface station records) | Y | **Implemented** | `stations.surface[0]` | Multi-station SS* X/Y parsed for Barnes OA. |
 | `US1` | station_record (USn upper-air station records) | Y | **Partial** | `stations.upper[0]` | UP.DAT sounding used; US1 coords unused. |
-| `PS1` | station_record (PSn precip station records) |  | **Partial** | `stations.precip[0]` | Coords parsed; rates need PRECIP.DAT. |
+| `PS1` | station_record (PSn precip station records) |  | **Implemented** | `stations.precip[0]` | Precip station X/Y + PRECIP.DAT rates for OA. |
 
 ## Suggested typed config surface
 

@@ -189,6 +189,9 @@ def objective_analyze(
     rmax1_m: float | None = None,
     rmax2_m: float | None = None,
     nintr2: list[int] | np.ndarray | None = None,
+    barriers=None,
+    xorig_km: float | None = None,
+    yorig_km: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Barnes-like OA of obs onto IGF (IPROG=14 style).
 
@@ -268,6 +271,16 @@ def objective_analyze(
                 w_stn = np.exp(-dist2 / max(rk, 1.0) ** 2)
                 if rmax is not None and rmax > 0:
                     w_stn = np.where(np.sqrt(dist2) <= rmax, w_stn, 0.0)
+                if barriers is not None:
+                    from .barriers import station_clear_mask
+                    x0k = (xorig_m / 1000.0) if xorig_km is None else xorig_km
+                    y0k = (yorig_m / 1000.0) if yorig_km is None else yorig_km
+                    clear = station_clear_mask(
+                        xc / 1000.0, yc / 1000.0,
+                        xs / 1000.0, ys / 1000.0,
+                        barriers, layer_k=k,
+                    )
+                    w_stn = np.where(clear, w_stn, 0.0)
                 if nintr2 is not None:
                     nmax = int(nintr2[k]) if k < len(nintr2) else int(nintr2[-1])
                     if nmax > 0 and nmax < w_stn.size:

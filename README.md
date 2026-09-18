@@ -2,12 +2,14 @@
 
 Pure-NumPy diagnostic meteorological downscaling inspired by CALMET (CALPUFF system).
 
-## Status — v1 + WP2 physics
+## Status — v1 + WP2 + WP3
 
-**Coverage:** Implemented **72** / Partial **135** / Missing **0** (of 207 INP params).
+**Coverage:** Implemented **118** / Partial **89** / Missing **0** (of 207 INP params).
 
 **v1.0** — diagnostic core + goldens. **WP2** — multi-station Barnes OA + RPROG,
 TOPOF2 IKINE, O'Brien IOBR, CLOUD3/4 RH clouds, NPSTA precip, COARE-lite overwater.
+**WP3** — MIXDT/MIXDT2 lapse, SEA.DAT + IWARM/ICOOL, PRECIP/CLOUD.DAT I/O,
+barriers/lake breeze, non-UTM projections, METLST/PACOUT, IOUTMM5 81–95.
 
 | Case | Grid | Modes | Notes |
 |------|------|-------|-------|
@@ -19,15 +21,15 @@ TOPOF2 IKINE, O'Brien IOBR, CLOUD3/4 RH clouds, NPSTA precip, COARE-lite overwat
 
 - Readers + writers: GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT / NetCDF
 - Winds: 3D→CALMET interp, IEXTRP profiles (power-law / SIMILT), multi-station Barnes OA (R1/R2/RPROG/RMAX*/NINTR2), **FRADJ**, **slope**, **NSMTH**; **IKINE TOPOF2** + **IOBR O'Brien** (gated)
-- PBL: night ELUSTR+MIXHT; daytime energy-budget QH + Maul–Carson ZI; RH clouds (MCLOUD 3/4); NPSTA precip; COARE-lite overwater
+- PBL: night ELUSTR+MIXHT; daytime energy-budget QH + Maul–Carson ZI with MIXDT lapse; RH clouds (MCLOUD 3/4); NPSTA precip + PRECIP.DAT; COARE-lite + SEA.DAT/IWARM/ICOOL
 - Golden parity: tiny-domain tight; wrf_demo U/V corr ≳ 0.97 (noobs); daytime ZI corr ≳ 0.99 vs Fortran shape
 
 ### Still Partial / next WPs
 
-- Sounding-based lapse rates above ZI (MIXDT) — daytime growth uses DPTMIN gamma
-- Full Fairall COARE 3.0 (warm-layer/cool-skin); SEA.DAT reader
-- PRECIP.DAT station rates; CLOUD.DAT I/O; IOUTMM5 variants beyond format 92
-- Barriers / lake breeze; non-UTM projections; PACOUT / METLST writers
+- Full Fairall COARE 3.0 (current: COARE-lite + IWARM/ICOOL + SEA.DAT waves)
+- IGF-CALMET first-guess (`IGFMET`); Batchvarova–Gryning `IMIXH=±2`
+- Print/debug flags (LPRINT/IPR*/IDIOPT*); multi-file NUSTA/NM3D/NIGF
+- Zi averaging / relaxation (`IAVEZI`, `IZICRLX`); temperature OA (`TRADKM`)
 - Raw wrfout in git (rebuild from NCAR tutorial; see `cases/wrf_demo/README.md`)
 
 

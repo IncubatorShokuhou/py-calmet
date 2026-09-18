@@ -979,6 +979,69 @@ for _k, _v in WP2_PARTIAL.items():
         MISSING.pop(_k, None)
 
 
+# --- WP3 overlays (MIXDT, SEA/PRECIP/CLOUD I/O, barriers, lake breeze, coord, outputs) ---
+WP3_IMPLEMENTED = {
+    "DPTMIN": "Floor for MIXDT/MIXDT2 pot-temp lapse above Zi (daytime Carson).",
+    "DZZI": "Depth (m) of MIXDT layer above Zi for sounding/prognostic lapse.",
+    "ITPROG": "0=obs MIXDT sounding; 1/2=MIXDT2 from 3D.DAT columns (wired in runner).",
+    "CONSTE": "Carson entrainment factor in mixht_day_carson.",
+    "SEADAT": "SEA.DAT reader (v2.0/2.1/2.11); SST/ΔT/waves → COARE path.",
+    "PRCDAT": "PRECIP.DAT reader; NPSTA>0 station rates → Barnes RMM.",
+    "PS1": "Precip station X/Y + PRECIP.DAT rates for OA.",
+    "IFORMP": "Formatted PRECIP.DAT (IFORMP=2) reader path.",
+    "CLDDAT": "CLOUD.DAT reader + ICLDOUT writer (formatted CLOUDFRA).",
+    "ICLDOUT": "Writes CLOUD.DAT when ICLDOUT≠0 and write_outputs=True.",
+    "IFORMC": "CLOUD.DAT formatted I/O (IFORMC=2).",
+    "IWARM": "COARE-lite warm-layer ΔT on skin SST when IWARM≠0.",
+    "ICOOL": "COARE-lite cool-skin ΔT when ICOOL≠0.",
+    "THRESHW": "Overwater convective boost hook in mixht_overwater.",
+    "NBAR": "Wind barriers block OA across barrier segments (KBAR-aware).",
+    "XBBAR": "Barrier begin X (km) used by BarrierSet.",
+    "YBBAR": "Barrier begin Y (km).",
+    "XEBAR": "Barrier end X (km).",
+    "YEBAR": "Barrier end Y (km).",
+    "KBAR": "Top layer (1-based) for barrier blocking in OA.",
+    "LLBREZE": "Lake-breeze surface blend inside NBOX influence boxes.",
+    "NBOX": "Number of lake-breeze boxes.",
+    "XG1": "Lake-breeze box X min (km).",
+    "XG2": "Lake-breeze box X max (km).",
+    "YG1": "Lake-breeze box Y min (km).",
+    "YG2": "Lake-breeze box Y max (km).",
+    "XBCST": "Coastline segment begin X for lake breeze.",
+    "YBCST": "Coastline segment begin Y.",
+    "XECST": "Coastline segment end X.",
+    "YECST": "Coastline segment end Y.",
+    "NLB": "Stations per lake-breeze box (METBXID count).",
+    "METBXID": "Station IDs inside lake-breeze boxes.",
+    "PMAP": "INP-driven MapProjection (UTM/LCC/TM/PS/EM/LAZA) for lat/lon.",
+    "DATUM": "Stored on MapProjection; used with PMAP.",
+    "FEAST": "False easting for LCC/TM/LAZA projections.",
+    "FNORTH": "False northing for LCC/TM/LAZA projections.",
+    "XLAT1": "LCC/PS standard parallel 1.",
+    "XLAT2": "LCC standard parallel 2.",
+    "METLST": "METLST list-file writer (run summary); runner writes when write_outputs=True.",
+    "METDAT": "METDAT name exposed on result.meta; LSAVE honored as flag.",
+    "PACDAT": "PACOUT.DAT npz writer when IFORMO=2 and write_outputs=True.",
+    "IFORMO": "1=CALMET.DAT path; 2=PACOUT hook.",
+    "LSAVE": "Output-save flag recorded on result.meta.",
+    "PRECIP": "RMM precip field computed (NPSTA path); print flag accepted.",
+    "TGDEFB": "Accepted; MIXDT falls back through DPTMIN when sounding thin.",
+    "TGDEFA": "Accepted; MIXDT falls back through DPTMIN when sounding thin.",
+}
+WP3_PARTIAL = {
+    "NFLAGP": "Precip QC flag still unused (rates pass through).",
+    "IFORMS": "SURF format assumed (dataset 2.1).",
+}
+for _k, _v in WP3_IMPLEMENTED.items():
+    IMPLEMENTED[_k] = _v
+    PARTIAL.pop(_k, None)
+    MISSING.pop(_k, None)
+for _k, _v in WP3_PARTIAL.items():
+    if _k not in IMPLEMENTED:
+        PARTIAL[_k] = _v
+        MISSING.pop(_k, None)
+
+
 # All remaining inventory names are at least accepted on CalmetConfig.
 # Mark former Missing as Partial "accepted, physics TBD" unless still truly absent.
 

@@ -11,8 +11,14 @@ from ..io.surf import read_surf
 from ..io.up import read_up
 from ..io.threed import read_3d
 from ..io.inp import read_inp
+from ..io.sea import read_sea, pick_sea_record
+from ..io.precip_dat import read_precip, rates_for_hour
+from ..io.cloud_dat import read_cloud, write_cloud, cloud_for_hour, CloudData, CloudRecord
+from ..io.metlst import write_metlst
+from ..io.pacout import write_pacout, mixed_layer_uv
 from .met_utils import layer_mids, coriolis, utm_to_latlon
-from . import winds, pbl, clouds, precip, overwater
+from . import winds, pbl, clouds, precip, overwater, mixdt, barriers as barriers_mod
+from .coord import MapProjection, domain_center_latlon
 
 
 @dataclass
@@ -59,22 +65,15 @@ def _pick_up_sounding(up, year, month, day, hour):
 def _estimate_latlon(inp, geo, nx, ny):
     """Return (lat0, lon0_east) at the domain center.
 
-    CALMET.INP samples comment out RLAT0/RLON0 (``* RLAT0= 0N *``), so the
-    runner must invert UTM. A previous fallback of (44.25N, 70W) silently
-    put non-Maine domains on the Maine solar geometry.
+    Honors RLAT0/RLON0 when set; else inverts via INP-driven MapProjection
+    (UTM / LCC / TM / …).
     """
-    lat0 = inp.get_float("RLAT0", -999.0)
-    lon0 = inp.get_float("RLON0", -999.0)
-    if -90.0 <= lat0 <= 90.0 and -180.0 <= lon0 <= 180.0 and abs(lat0) + abs(lon0) > 0.0:
-        return float(lat0), float(lon0)
-
-    xc = (geo.xorigkm + 0.5 * nx * geo.dgridkm) * 1000.0
-    yc = (geo.yorigkm + 0.5 * ny * geo.dgridkm) * 1000.0
-    zone = inp.get_int("IUTMZN", 19)
-    hem = str(inp.get("UTMHEM", "N") or "N").strip().upper()[:1]
-    northern = hem != "S"
-    lat, lon_e = utm_to_latlon(xc, yc, zone, northern=northern)
-    return float(lat), float(lon_e)
+    proj = MapProjection.from_inp(inp)
+    if abs(proj.rlat0) + abs(proj.rlon0) > 0.0 and -90 <= proj.rlat0 <= 90:
+        return float(proj.rlat0), float(proj.rlon0)
+    return domain_center_latlon(
+        geo.xorigkm, geo.yorigkm, nx, ny, geo.dgridkm, proj
+    )
 
 
 def _run_window(inp):
@@ -174,8 +173,14 @@ def run_calmet(
     case_dir: str | Path,
     mode: Optional[str] = None,
     inputs_dir: Optional[str | Path] = None,
+    *,
+    write_outputs: bool = False,
 ) -> CalmetResult:
-    """Run pure-NumPy diagnostic for a case directory."""
+    """Run pure-NumPy diagnostic for a case directory.
+
+    When ``write_outputs`` is True, honor METLST / IFORMO=2 PACOUT / ICLDOUT
+    writers into ``case_dir``. Default False keeps golden directories pristine.
+    """
     case_dir = Path(case_dir)
     inp = read_inp(case_dir / "calmet.inp")
     if mode is None:
@@ -216,6 +221,48 @@ def run_calmet(
     surf = read_surf(srf_path) if srf_path is not None and mode != "noobs" else None
     up = read_up(up_path) if up_path is not None and mode != "noobs" else None
     threed = read_3d(m3d_path) if m3d_path is not None and mode != "obs" else None
+
+    # Optional SEA.DAT (NOWSTA / SEADAT)
+    sea_stations = []
+    sea_name = inp.get("SEADAT")
+    sea_path = _resolve_data_file(inputs_dir, case_dir, sea_name, "sea.dat")
+    if sea_path is not None:
+        try:
+            sea_stations.append(read_sea(sea_path))
+        except Exception:
+            pass
+    # SEADAT may be a list of files on config
+    if cfg is not None and getattr(cfg, "seadat", None):
+        raw = cfg.seadat
+        names = raw if isinstance(raw, (list, tuple)) else [raw]
+        for n in names:
+            sp = _resolve_data_file(inputs_dir, case_dir, n, "sea.dat")
+            if sp is not None and (not sea_path or sp != sea_path):
+                try:
+                    sea_stations.append(read_sea(sp))
+                except Exception:
+                    pass
+
+    # Optional PRECIP.DAT
+    precip_data = None
+    prc_path = _resolve_data_file(inputs_dir, case_dir, inp.get("PRCDAT"), "precip.dat")
+    if prc_path is not None:
+        try:
+            precip_data = read_precip(prc_path, npsta=inp.get_int("NPSTA", 0) or None)
+        except Exception:
+            precip_data = None
+
+    # Optional CLOUD.DAT (ICLOUD=1 / MCLOUD read path)
+    cloud_data = None
+    cld_path = _resolve_data_file(inputs_dir, case_dir, inp.get("CLDDAT"), "cloud.dat")
+    if cld_path is not None:
+        try:
+            cloud_data = read_cloud(cld_path, nx, ny)
+        except Exception:
+            cloud_data = None
+
+    barrier_set = barriers_mod.BarrierSet.from_inp(inp)
+    lake_cfg = barriers_mod.LakeBreezeConfig.from_inp(inp)
 
     xs_list, ys_list = _parse_surface_stations(inp, geo, nx, ny)
     xs_km, ys_km = xs_list[0], ys_list[0]
@@ -265,6 +312,17 @@ def run_calmet(
     constw = inp.get_float("CONSTW", 0.16)
     ziminw = inp.get_float("ZIMINW", 50.0)
     zimaxw = inp.get_float("ZIMAXW", 3000.0)
+    iwarm = inp.get_int("IWARM", 0)
+    icool = inp.get_int("ICOOL", 0)
+    threshw = inp.get_float("THRESHW", 0.05)
+    itprog = inp.get_int("ITPROG", 0)
+    dzzi = inp.get_float("DZZI", 200.0)
+    conste = inp.get_float("CONSTE", 0.15)
+    iformo = inp.get_int("IFORMO", 1)
+    lsave = inp.get_bool("LSAVE", True)
+    icldout = inp.get_int("ICLDOUT", 0)
+    iformc = inp.get_int("IFORMC", 2)
+    ps_xs, ps_ys = _parse_precip_stations(inp)
     # JWAT1/JWAT2 are the INP names; IWAT1/IWAT2 are GEO/header aliases.
     if cfg is not None and hasattr(cfg, "effective_iwat"):
         iwat1, iwat2 = cfg.effective_iwat()
@@ -421,6 +479,7 @@ def run_calmet(
                 rmax1_m=(rmax1_km * 1000.0) if rmax1_km > 0 else None,
                 rmax2_m=(rmax2_km * 1000.0) if rmax2_km > 0 else None,
                 nintr2=nintr2 or None,
+                barriers=barrier_set,
             )
             sky = rec.sky
             irh = np.full((ny, nx), rec.rh, dtype=np.int32)
@@ -511,6 +570,21 @@ def run_calmet(
                 U, V, W_pre, zface, dgrid_m, niter=min(niter, 50), divlim=divlim
             )
 
+        # Lake-breeze surface adjustment when LLBREZE=T
+        if lake_cfg is not None:
+            U, V = barriers_mod.apply_lake_breeze(
+                U, V,
+                xorig_km=geo.xorigkm, yorig_km=geo.yorigkm, dgrid_km=geo.dgridkm,
+                cfg=lake_cfg,
+            )
+
+        # Override ccfrac from CLOUD.DAT when available (ICLOUD=1 / file present)
+        if cloud_data is not None:
+            jday_c = int(step_t.strftime("%j"))
+            cc_file = cloud_for_hour(cloud_data, ibyr, jday_c, hour)
+            if cc_file is not None:
+                ccfrac = np.asarray(cc_file, dtype=np.float64)
+
         # Recompute ustar/el/zi from final near-surface winds (post-DIAGNO)
         qh_eb = pbl.heat_flux_energy_budget(
             qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2, hc1=hc1, hc2=hc2, hc3=hc3
@@ -522,6 +596,49 @@ def run_calmet(
         el = np.where(day_cell, el_d, el_n)
         qh = np.where(day_cell, qh_eb, qh_n)
         if np.any(day_cell):
+            # MIXDT / MIXDT2 sounding-based lapse above Zi (ITPROG)
+            snd_z = snd_t = None
+            hag_3d = t3d = None
+            if up is not None:
+                sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
+                try:
+                    stn_elev = float(np.min(elev))
+                    snd_z = np.array(
+                        [lev.height - stn_elev for lev in sounding.levels],
+                        dtype=np.float64,
+                    )
+                    # UP.DAT stores temp as deg C → Kelvin for MIXDT
+                    snd_t = np.array(
+                        [lev.temp_c + 273.15 for lev in sounding.levels],
+                        dtype=np.float64,
+                    )
+                except Exception:
+                    snd_z = snd_t = None
+            if threed is not None:
+                ti_g = min(h, threed.tempk.shape[0] - 1)
+                # Map 3D column heights AGL onto CALMET grid (nearest)
+                hag_3d = np.zeros((threed.nk, ny, nx), dtype=np.float64)
+                t3d = np.zeros_like(hag_3d)
+                for j in range(ny):
+                    for i in range(nx):
+                        xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                        yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                        ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                        elev_c = float(threed.elev[jj, ii])
+                        hag_3d[:, j, i] = np.maximum(
+                            threed.height_msl[ti_g, jj, ii, :] - elev_c, 1.0
+                        )
+                        t3d[:, j, i] = threed.tempk[ti_g, jj, ii, :]
+            gamma_zi = mixdt.resolve_gamma(
+                itprog=itprog,
+                ziconv=ziconv_prev,
+                dptmin=dptmin,
+                dzzi=dzzi,
+                sounding_z=snd_z,
+                sounding_t=snd_t,
+                height_agl_3d=hag_3d,
+                tempk_3d=t3d,
+            )
             zi_d, ziconv, dptt_prev = pbl.mixht_day_carson(
                 np.where(day_cell, qh, 0.0),
                 rho,
@@ -533,7 +650,8 @@ def run_calmet(
                 dptt_prev=dptt_prev,
                 threshl=threshl,
                 constb=constb,
-                dtheta=dptmin,
+                conste=conste,
+                dtheta=gamma_zi,
                 zimin=zimin,
                 zimax=zimax,
             )
@@ -552,13 +670,30 @@ def run_calmet(
         zi = np.clip(zi, zimin, zimax)
 
         # Overwater COARE-lite when ICOARE≠0 and overwater stations/SEA path
-        # engaged (NOWSTA>0). Goldens use NOWSTA=0 → land PBL retained.
+        # engaged (NOWSTA>0 or SEA.DAT present). Goldens use NOWSTA=0 → land PBL.
         nowsta = inp.get_int("NOWSTA", 0)
+        if nowsta <= 0 and sea_stations:
+            nowsta = len(sea_stations)
         if icoare != 0 and nowsta > 0:
+            t_sea = None
+            twave = hwave = None
+            if sea_stations:
+                jday_s = int(step_t.strftime("%j"))
+                recs = []
+                for st in sea_stations:
+                    r = pick_sea_record(st, ibyr, jday_s, hour)
+                    if r is not None:
+                        recs.append(r)
+                if recs:
+                    t_sea, twave, hwave = overwater.sea_sst_grid(
+                        recs, nx, ny, geo.xorigkm, geo.yorigkm, geo.dgridkm, temp2d
+                    )
             ustar, el, qh, zi = overwater.apply_overwater_pbl(
                 geo.landuse, iwat1, iwat2, U[0], V[0], temp2d, rho,
                 ustar, el, qh, zi, fcori,
-                icoare=icoare, constw=constw, ziminw=ziminw, zimaxw=zimaxw, dshelf=dshelf,
+                icoare=icoare, t_sea=t_sea, constw=constw, ziminw=ziminw, zimaxw=zimaxw,
+                dshelf=dshelf, iwarm=iwarm, icool=icool, qsw=qsw,
+                twave=twave, hwave=hwave, threshw=threshw,
             )
 
         # Recompute MO length from the QH actually stored (energy-budget by
@@ -581,7 +716,19 @@ def run_calmet(
         if threed is not None and hasattr(threed, "rain"):
             ti_r = min(h, threed.rain.shape[0] - 1)
             rain_prog = threed.rain[ti_r]
-        # NPSTA: -1 prognostic, 0 none, >0 station OA (rates default 0 without PRECIP.DAT)
+        # NPSTA: -1 prognostic, 0 none, >0 station OA (PRECIP.DAT rates when present)
+        stn_x_m = stn_y_m = stn_rmm = None
+        if npsta > 0 and ps_xs:
+            stn_x_m = np.asarray(ps_xs, dtype=np.float64) * 1000.0
+            stn_y_m = np.asarray(ps_ys, dtype=np.float64) * 1000.0
+            jday_p = int(step_t.strftime("%j"))
+            if precip_data is not None:
+                rates = rates_for_hour(precip_data, ibyr, jday_p, hour, missing=0.0)
+                stn_rmm = np.asarray(rates[: len(ps_xs)], dtype=np.float64)
+                if stn_rmm.size < len(ps_xs):
+                    stn_rmm = np.pad(stn_rmm, (0, len(ps_xs) - stn_rmm.size))
+            else:
+                stn_rmm = np.zeros(len(ps_xs), dtype=np.float64)
         rmm = precip.resolve_precip(
             npsta=npsta,
             nx=nx,
@@ -591,6 +738,9 @@ def run_calmet(
             xorig_km=geo.xorigkm,
             yorig_km=geo.yorigkm,
             dgrid_km=geo.dgridkm,
+            stn_x_m=stn_x_m,
+            stn_y_m=stn_y_m,
+            stn_rmm=stn_rmm,
             sigmap_km=sigmap,
             cutp=cutp,
         )
@@ -610,7 +760,7 @@ def run_calmet(
         IRH_all.append(irh)
         RMM_all.append(rmm)
 
-    return CalmetResult(
+    result = CalmetResult(
         mode=mode,
         zface=zface,
         U=np.stack(U_all),
@@ -644,5 +794,75 @@ def run_calmet(
             "icloud": icloud,
             "npsta": npsta,
             "icoare": icoare,
+            "itprog": itprog,
+            "iformo": iformo,
+            "ioutmm5": int(getattr(threed, "ioutmm5", 92)) if threed is not None else None,
+            "pmap": MapProjection.from_inp(inp).pmap,
         },
     )
+
+    if write_outputs:
+        # METLST list-file hook
+        metlst_name = inp.get("METLST")
+        if metlst_name:
+            lst_path = case_dir / str(metlst_name).strip().strip("'\"")
+            write_metlst(
+                lst_path,
+                title="py-calmet METLST",
+                mode=mode,
+                nhrs=nhrs,
+                grid={
+                    "nx": nx, "ny": ny, "nz": nz,
+                    "dgridkm": geo.dgridkm,
+                    "xorigkm": geo.xorigkm, "yorigkm": geo.yorigkm,
+                    "pmap": MapProjection.from_inp(inp).pmap,
+                },
+                inp_summary={
+                    "NOOBS": inp.get_int("NOOBS", 0),
+                    "IPROG": inp.get_int("IPROG", 0),
+                    "ITPROG": itprog,
+                    "ICOARE": icoare,
+                    "NPSTA": npsta,
+                    "IFORMO": iformo,
+                    "NBAR": inp.get_int("NBAR", 0),
+                    "LLBREZE": inp.get_bool("LLBREZE", False),
+                },
+                notes=[
+                    "List file written by py-calmet (not bit-identical to Fortran METLST).",
+                ],
+            )
+            result.meta["metlst"] = str(lst_path)
+
+        # PACOUT hook when IFORMO=2
+        if int(iformo) == 2:
+            pac_name = inp.get("PACDAT") or "PACOUT.DAT"
+            pac_path = case_dir / str(pac_name).strip().strip("'\"")
+            um, vm = mixed_layer_uv(result.U, result.V, result.ZI, zface)
+            write_pacout(
+                pac_path,
+                U_mix=um, V_mix=vm,
+                zi=result.ZI, ustar=result.USTAR, wstar=result.WSTAR,
+                el=result.EL, ipgt=result.IPGT, rmm=result.RMM,
+                rho=result.RHO, tempk=result.TEMPK, qsw=result.QSW, irh=result.IRH,
+                meta={"nx": nx, "ny": ny, "nhrs": nhrs},
+            )
+            result.meta["pacout"] = str(pac_path)
+
+        # CLOUD.DAT writer when ICLDOUT≠0
+        if int(icldout) != 0:
+            cld_out = case_dir / str(inp.get("CLDDAT") or "CLOUD.DAT").strip().strip("'\"")
+            recs = []
+            for h in range(nhrs):
+                step_t = start + __import__("datetime").timedelta(seconds=h * nsecdt)
+                # QSW-based cloud proxy from stored IRH if no better
+                cc = np.clip((result.IRH[h].astype(np.float64) - 50.0) / 50.0, 0.0, 1.0)
+                recs.append(CloudRecord(
+                    year=step_t.year, jday=int(step_t.strftime("%j")), hour=step_t.hour,
+                    ccgrid=cc,
+                ))
+            write_cloud(cld_out, CloudData(nx=nx, ny=ny, records=recs), iformc=iformc)
+            result.meta["clddat_out"] = str(cld_out)
+
+    result.meta["metdat"] = str(metdat_name)
+    result.meta["lsave"] = bool(lsave)
+    return result

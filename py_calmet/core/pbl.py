@@ -118,7 +118,12 @@ def mixht_day_carson(
     htold = np.zeros_like(qh) if ziconv_prev is None else np.asarray(ziconv_prev, dtype=np.float64).copy()
     dptt = np.zeros_like(qh) if dptt_prev is None else np.asarray(dptt_prev, dtype=np.float64).copy()
 
-    gamma = max(float(dtheta), 1e-4)  # pot-temp lapse above zi (K/m)
+    # pot-temp lapse above zi (K/m); scalar or 2-D from MIXDT/MIXDT2
+    gamma = np.asarray(dtheta, dtype=np.float64)
+    if gamma.ndim == 0:
+        gamma = np.full(qh.shape, max(float(gamma), 1e-4))
+    else:
+        gamma = np.maximum(gamma, 1e-4)
     onedte = dt_sec * (1.0 + conste)
     twodte = 2.0 * dt_sec * conste
 

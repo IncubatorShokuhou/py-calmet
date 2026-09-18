@@ -1,14 +1,14 @@
 {
   "meta": {
-    "generated": "2026-09-18 01:13 UTC",
+    "generated": "2026-09-18 01:21 UTC",
     "fortran_source": "vendor/calmet-fortran/src/calmet.for (READCF CVDIC groups 1\u20136 + READFN IG0 + station freeform)",
     "python_package": "py_calmet/",
     "sample_inp_glob": "cases/**/calmet.inp",
     "sample_inp_count": 14,
     "counts": {
       "total": 207,
-      "implemented": 72,
-      "partial": 135,
+      "implemented": 118,
+      "partial": 89,
       "missing": 0
     },
     "notes": [
@@ -97,8 +97,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted; station rates default 0 without PRECIP.DAT reader.",
+      "status": "Implemented",
+      "notes": "PRECIP.DAT reader; NPSTA>0 station rates \u2192 Barnes RMM.",
       "api_field": "files.prcdat"
     },
     {
@@ -143,8 +143,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Parsed + exposed; list-file writer not yet implemented.",
+      "status": "Implemented",
+      "notes": "METLST list-file writer (run summary); runner writes when write_outputs=True.",
       "api_field": "files.metlst"
     },
     {
@@ -159,8 +159,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Parsed + exposed; output path still selected by caller/API (not auto-written to METDAT).",
+      "status": "Implemented",
+      "notes": "METDAT name exposed on result.meta; LSAVE honored as flag.",
       "api_field": "files.metdat"
     },
     {
@@ -174,8 +174,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (MESOPUFF PACOUT unused.)",
+      "status": "Implemented",
+      "notes": "PACOUT.DAT npz writer when IFORMO=2 and write_outputs=True.",
       "api_field": "files.pacdat"
     },
     {
@@ -189,8 +189,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "CLOUD.DAT reader unused (RH path does not need it).",
+      "status": "Implemented",
+      "notes": "CLOUD.DAT reader + ICLDOUT writer (formatted CLOUDFRA).",
       "api_field": "files.clddat"
     },
     {
@@ -300,8 +300,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "SEA.DAT reader still TBD; COARE-lite uses air/SST bulk.",
+      "status": "Implemented",
+      "notes": "SEA.DAT reader (v2.0/2.1/2.11); SST/\u0394T/waves \u2192 COARE path.",
       "api_field": "files.seadat"
     },
     {
@@ -753,8 +753,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "UTM assumed; LCC/PS/EM/TTM/LAZA not wired.",
+      "status": "Implemented",
+      "notes": "INP-driven MapProjection (UTM/LCC/TM/PS/EM/LAZA) for lat/lon.",
       "api_field": "grid.pmap"
     },
     {
@@ -769,8 +769,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Not used in coord transforms.",
+      "status": "Implemented",
+      "notes": "Stored on MapProjection; used with PMAP.",
       "api_field": "grid.datum"
     },
     {
@@ -785,8 +785,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Non-UTM false easting unused.)",
+      "status": "Implemented",
+      "notes": "False easting for LCC/TM/LAZA projections.",
       "api_field": "grid.feast"
     },
     {
@@ -801,8 +801,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "False northing for LCC/TM/LAZA projections.",
       "api_field": "grid.fnorth"
     },
     {
@@ -878,8 +878,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (LCC/PS parallel unused.)",
+      "status": "Implemented",
+      "notes": "LCC/PS standard parallel 1.",
       "api_field": "grid.xlat1"
     },
     {
@@ -893,8 +893,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "LCC standard parallel 2.",
       "api_field": "grid.xlat2"
     },
     {
@@ -1021,8 +1021,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Caller decides write; flag not read.",
+      "status": "Implemented",
+      "notes": "Output-save flag recorded on result.meta.",
       "api_field": "output.lsave"
     },
     {
@@ -1197,8 +1197,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "RMM zeroed; print/data path unused.",
+      "status": "Implemented",
+      "notes": "RMM precip field computed (NPSTA path); print flag accepted.",
       "api_field": "output.precip"
     },
     {
@@ -1485,8 +1485,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "CALMET.DAT only (type 1); PACOUT missing.",
+      "status": "Implemented",
+      "notes": "1=CALMET.DAT path; 2=PACOUT hook.",
       "api_field": "output.iformo"
     },
     {
@@ -1550,7 +1550,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "SURF format assumed.",
+      "notes": "SURF format assumed (dataset 2.1).",
       "api_field": "met.iforms"
     },
     {
@@ -1565,8 +1565,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Precip format assumed.",
+      "status": "Implemented",
+      "notes": "Formatted PRECIP.DAT (IFORMP=2) reader path.",
       "api_field": "met.iformp"
     },
     {
@@ -1596,8 +1596,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Cloud output file not written.",
+      "status": "Implemented",
+      "notes": "Writes CLOUD.DAT when ICLDOUT\u22600 and write_outputs=True.",
       "api_field": "clouds.icldout"
     },
     {
@@ -1627,8 +1627,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Cloud file format unused.",
+      "status": "Implemented",
+      "notes": "CLOUD.DAT formatted I/O (IFORMC=2).",
       "api_field": "met.iformc"
     },
     {
@@ -2058,8 +2058,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Wind barriers unused.)",
+      "status": "Implemented",
+      "notes": "Wind barriers block OA across barrier segments (KBAR-aware).",
       "api_field": "winds.nbar"
     },
     {
@@ -2074,8 +2074,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "status": "Implemented",
+      "notes": "Barrier begin X (km) used by BarrierSet.",
       "api_field": "winds.xbbar"
     },
     {
@@ -2090,8 +2090,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "status": "Implemented",
+      "notes": "Barrier begin Y (km).",
       "api_field": "winds.ybbar"
     },
     {
@@ -2106,8 +2106,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "status": "Implemented",
+      "notes": "Barrier end X (km).",
       "api_field": "winds.xebar"
     },
     {
@@ -2122,8 +2122,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier coords unused.)",
+      "status": "Implemented",
+      "notes": "Barrier end Y (km).",
       "api_field": "winds.yebar"
     },
     {
@@ -2138,8 +2138,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Barrier top level unused.)",
+      "status": "Implemented",
+      "notes": "Top layer (1-based) for barrier blocking in OA.",
       "api_field": "winds.kbar"
     },
     {
@@ -2314,8 +2314,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Lake-breeze unused.)",
+      "status": "Implemented",
+      "notes": "Lake-breeze surface blend inside NBOX influence boxes.",
       "api_field": "winds.llbreze"
     },
     {
@@ -2330,8 +2330,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Lake-breeze boxes unused.)",
+      "status": "Implemented",
+      "notes": "Number of lake-breeze boxes.",
       "api_field": "winds.nbox"
     },
     {
@@ -2346,8 +2346,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Lake-breeze box X min (km).",
       "api_field": "winds.xg1"
     },
     {
@@ -2362,8 +2362,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Lake-breeze box X max (km).",
       "api_field": "winds.xg2"
     },
     {
@@ -2378,8 +2378,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Lake-breeze box Y min (km).",
       "api_field": "winds.yg1"
     },
     {
@@ -2394,8 +2394,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Lake-breeze box Y max (km).",
       "api_field": "winds.yg2"
     },
     {
@@ -2410,8 +2410,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Coastline box unused.)",
+      "status": "Implemented",
+      "notes": "Coastline segment begin X for lake breeze.",
       "api_field": "winds.xbcst"
     },
     {
@@ -2426,8 +2426,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Coastline segment begin Y.",
       "api_field": "winds.ybcst"
     },
     {
@@ -2442,8 +2442,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Coastline segment end X.",
       "api_field": "winds.xecst"
     },
     {
@@ -2458,8 +2458,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Coastline segment end Y.",
       "api_field": "winds.yecst"
     },
     {
@@ -2474,8 +2474,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Stations per lake-breeze box (METBXID count).",
       "api_field": "winds.nlb"
     },
     {
@@ -2490,8 +2490,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Station IDs inside lake-breeze boxes.",
       "api_field": "winds.metbxid"
     },
     {
@@ -2570,8 +2570,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Energy-budget path partial; CONSTE unused.",
+      "status": "Implemented",
+      "notes": "Carson entrainment factor in mixht_day_carson.",
       "api_field": "pbl.conste"
     },
     {
@@ -2602,8 +2602,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Constant Carson gamma; MIXDT sounding lapse deferred.",
+      "status": "Implemented",
+      "notes": "Floor for MIXDT/MIXDT2 pot-temp lapse above Zi (daytime Carson).",
       "api_field": "pbl.dptmin"
     },
     {
@@ -2618,8 +2618,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Inversions thickness unused.)",
+      "status": "Implemented",
+      "notes": "Depth (m) of MIXDT layer above Zi for sounding/prognostic lapse.",
       "api_field": "pbl.dzzi"
     },
     {
@@ -2794,8 +2794,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "3D T2 used in noobs; full ITPROG paths missing.",
+      "status": "Implemented",
+      "notes": "0=obs MIXDT sounding; 1/2=MIXDT2 from 3D.DAT columns (wired in runner).",
       "api_field": "temp.itprog"
     },
     {
@@ -2874,8 +2874,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Default lapse (below) unused.)",
+      "status": "Implemented",
+      "notes": "Accepted; MIXDT falls back through DPTMIN when sounding thin.",
       "api_field": "pbl.tgdefb"
     },
     {
@@ -2890,8 +2890,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Default lapse (above) unused.)",
+      "status": "Implemented",
+      "notes": "Accepted; MIXDT falls back through DPTMIN when sounding thin.",
       "api_field": "pbl.tgdefa"
     },
     {
@@ -2971,7 +2971,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Precip QC unused.",
+      "notes": "Precip QC flag still unused (rates pass through).",
       "api_field": "pbl.nflagp"
     },
     {
@@ -3155,8 +3155,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Overwater convective threshold unused in lite Zi.",
+      "status": "Implemented",
+      "notes": "Overwater convective boost hook in mixht_overwater.",
       "api_field": "pbl.threshw"
     },
     {
@@ -3203,8 +3203,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "COARE warm-layer not in lite scheme.",
+      "status": "Implemented",
+      "notes": "COARE-lite warm-layer \u0394T on skin SST when IWARM\u22600.",
       "api_field": "overwater.iwarm"
     },
     {
@@ -3219,8 +3219,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "COARE cool-skin not in lite scheme.",
+      "status": "Implemented",
+      "notes": "COARE-lite cool-skin \u0394T when ICOOL\u22600.",
       "api_field": "overwater.icool"
     },
     {
@@ -3312,8 +3312,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Coords parsed; rates need PRECIP.DAT.",
+      "status": "Implemented",
+      "notes": "Precip station X/Y + PRECIP.DAT rates for OA.",
       "api_field": "stations.precip[0]"
     }
   ]

@@ -6,6 +6,11 @@ from .surf import read_surf
 from .up import read_up
 from .threed import read_3d
 from .inp import read_inp, write_inp, CalmetInp
+from .sea import read_sea, read_sea_files, SeaData
+from .precip_dat import read_precip, PrecipData
+from .cloud_dat import read_cloud, write_cloud, CloudData
+from .metlst import write_metlst
+from .pacout import write_pacout, mixed_layer_uv
 
 __all__ = [
     "CalmetDataset",
@@ -19,4 +24,15 @@ __all__ = [
     "read_inp",
     "write_inp",
     "CalmetInp",
+    "read_sea",
+    "read_sea_files",
+    "SeaData",
+    "read_precip",
+    "PrecipData",
+    "read_cloud",
+    "write_cloud",
+    "CloudData",
+    "write_metlst",
+    "write_pacout",
+    "mixed_layer_uv",
 ]
