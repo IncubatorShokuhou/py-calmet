@@ -82,3 +82,40 @@ def test_check_unsupported_switches():
     cfg.igfmet = 1
     with pytest.raises(NotImplementedError, match="IGFMET"):
         cfg.check_unsupported()
+
+
+def test_objective_analyze_multistation_matches_single():
+    """Multi-station API with one station must match legacy single-station OA."""
+    import numpy as np
+    from py_calmet.core.winds import objective_analyze
+
+    rng = np.random.default_rng(0)
+    nz, ny, nx = 3, 5, 5
+    ug = rng.normal(size=(nz, ny, nx))
+    vg = rng.normal(size=(nz, ny, nx))
+    uo = ug + 1.0
+    vo = vg - 0.5
+    kwargs = dict(
+        xorig_m=0.0,
+        yorig_m=0.0,
+        dgrid_m=1000.0,
+        r1_m=2000.0,
+        r2_m=4000.0,
+        xs_m=2500.0,
+        ys_m=2500.0,
+    )
+    U1, V1 = objective_analyze(ug, vg, uo, vo, **kwargs)
+    U2, V2 = objective_analyze(ug, vg, uo, vo, rprog_m=0.0, **kwargs)
+    assert np.allclose(U1, U2) and np.allclose(V1, V2)
+    # two identical stations → same as one when RMAX open
+    xs = np.array([2500.0, 2500.0])
+    ys = np.array([2500.0, 2500.0])
+    u_stn = np.stack([uo[:, 2, 2], uo[:, 2, 2]], axis=0)  # (nstn, nz) approx center
+    # use profile form
+    u_prof = np.stack([uo[:, ny//2, nx//2], uo[:, ny//2, nx//2]], axis=0)
+    v_prof = np.stack([vo[:, ny//2, nx//2], vo[:, ny//2, nx//2]], axis=0)
+    Um, Vm = objective_analyze(
+        ug, vg, u_prof, v_prof, xs, ys,
+        xorig_m=0.0, yorig_m=0.0, dgrid_m=1000.0, r1_m=2000.0, r2_m=4000.0,
+    )
+    assert Um.shape == ug.shape

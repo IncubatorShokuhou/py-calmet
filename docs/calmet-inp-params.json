@@ -1,14 +1,14 @@
 {
   "meta": {
-    "generated": "2026-09-18 01:07 UTC",
+    "generated": "2026-09-18 01:09 UTC",
     "fortran_source": "vendor/calmet-fortran/src/calmet.for (READCF CVDIC groups 1\u20136 + READFN IG0 + station freeform)",
     "python_package": "py_calmet/",
     "sample_inp_glob": "cases/**/calmet.inp",
     "sample_inp_count": 14,
     "counts": {
       "total": 207,
-      "implemented": 43,
-      "partial": 164,
+      "implemented": 45,
+      "partial": 162,
       "missing": 0
     },
     "notes": [
@@ -1835,7 +1835,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (OA distance cutoff unused.)",
+      "notes": "Accepted; optional OA cutoff in multi-station path.",
       "api_field": "winds.rmax1"
     },
     {
@@ -1851,7 +1851,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "notes": "Accepted; optional OA cutoff aloft.",
       "api_field": "winds.rmax2"
     },
     {
@@ -1914,8 +1914,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Single-station Barnes surface radius; multi-station OA missing.",
+      "status": "Implemented",
+      "notes": "Barnes OA surface radius (single + multi-station).",
       "api_field": "winds.r1"
     },
     {
@@ -1930,8 +1930,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Aloft OA radius; multi-station incomplete.",
+      "status": "Implemented",
+      "notes": "Barnes OA aloft radius (single + multi-station).",
       "api_field": "winds.r2"
     },
     {
@@ -1947,7 +1947,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
       "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Prog weight in OA unused.)",
+      "notes": "Accepted; wired into objective_analyze as IGF weight (0=off, golden-safe).",
       "api_field": "winds.rprog"
     },
     {

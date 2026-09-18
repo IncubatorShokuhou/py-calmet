@@ -198,6 +198,9 @@ def run_calmet(
     zimax = inp.get_float("ZIMAX", 3000.0)
     r1_km = inp.get_float("R1", 1.0)
     r2_km = inp.get_float("R2", r1_km)
+    rprog_km = inp.get_float("RPROG", 0.0)
+    rmax1_km = inp.get_float("RMAX1", 0.0)
+    rmax2_km = inp.get_float("RMAX2", rmax1_km)
     alpha = inp.get_float("ALPHA", 0.1)
     niter = inp.get_int("NITER", 50)
     threshl = inp.get_float("THRESHL", 0.05)
@@ -327,6 +330,9 @@ def run_calmet(
                 dgrid_m=dgrid_m,
                 r1_m=r1_km * 1000.0,
                 r2_m=r2_km * 1000.0,
+                rprog_m=rprog_km * 1000.0,
+                rmax1_m=(rmax1_km * 1000.0) if rmax1_km > 0 else None,
+                rmax2_m=(rmax2_km * 1000.0) if rmax2_km > 0 else None,
             )
             sky = rec.sky
             irh = np.full((ny, nx), rec.rh, dtype=np.int32)

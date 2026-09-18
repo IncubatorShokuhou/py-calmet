@@ -132,16 +132,25 @@ def objective_analyze(
     vg: np.ndarray,
     u_obs: np.ndarray,
     v_obs: np.ndarray,
-    xs_m: float,
-    ys_m: float,
+    xs_m: float | np.ndarray,
+    ys_m: float | np.ndarray,
     xorig_m: float,
     yorig_m: float,
     dgrid_m: float,
     r1_m: float,
     r2_m: float | None = None,
+    rprog_m: float = 0.0,
+    rmax1_m: float | None = None,
+    rmax2_m: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Single-station Barnes-like OA of obs onto IGF (IPROG=14 style).
+    """Barnes-like OA of obs onto IGF (IPROG=14 style).
 
+    * Single-station: ``xs_m``/``ys_m`` scalars (legacy path; golden-compatible).
+    * Multi-station: 1-D ``xs_m``/``ys_m`` with matching station U/V in
+      ``u_obs``/``v_obs`` shaped ``(nstn, nz)`` **or** still ``(nz, ny, nx)``
+      gridded obs (then stations are sampled at ``xs_m``/``ys_m``).
+    * ``rprog_m``: diagnostic influence radius for the IGF/prog field used as
+      an extra "station" at every grid point (CALMET RPROG). ``0`` disables.
     Surface (layer 0) uses R1; aloft layers use R2 (defaults to R1).
     """
     nz, ny, nx = ug.shape
@@ -149,16 +158,81 @@ def objective_analyze(
     V = vg.copy()
     if r2_m is None:
         r2_m = r1_m
+
+    xs = np.atleast_1d(np.asarray(xs_m, dtype=np.float64))
+    ys = np.atleast_1d(np.asarray(ys_m, dtype=np.float64))
+    nstn = int(xs.size)
+
+    # Normalize obs to per-station profiles (nstn, nz)
+    u_obs_a = np.asarray(u_obs, dtype=np.float64)
+    v_obs_a = np.asarray(v_obs, dtype=np.float64)
+    if u_obs_a.ndim == 3 and u_obs_a.shape == (nz, ny, nx) and nstn == 1:
+        # legacy: obs already gridded — keep previous formula exactly
+        for j in range(ny):
+            for i in range(nx):
+                xc = xorig_m + (i + 0.5) * dgrid_m
+                yc = yorig_m + (j + 0.5) * dgrid_m
+                dist2 = (xc - float(xs[0])) ** 2 + (yc - float(ys[0])) ** 2
+                for k in range(nz):
+                    rk = r1_m if k == 0 else r2_m
+                    w = np.exp(-dist2 / max(rk, 1.0) ** 2)
+                    if rprog_m and rprog_m > 0.0:
+                        # Blend toward IGF with prog weight at every cell
+                        wp = np.exp(0.0)  # self-distance 0 → weight 1 * scaled
+                        # Effective: obs weight w, prog weight wp_scaled
+                        wp = (r1_m / max(rprog_m, 1.0)) ** 2 if k == 0 else (r2_m / max(rprog_m, 1.0)) ** 2
+                        # Standard CALMET-ish: final = (w*obs + wp*ug) / (w+wp)
+                        # with residual IGF when both small — collapse to legacy when rprog=0
+                        denom = w + wp
+                        U[k, j, i] = (w * u_obs_a[k, j, i] + wp * ug[k, j, i]) / denom
+                        V[k, j, i] = (w * v_obs_a[k, j, i] + wp * vg[k, j, i]) / denom
+                    else:
+                        U[k, j, i] = (1.0 - w) * ug[k, j, i] + w * u_obs_a[k, j, i]
+                        V[k, j, i] = (1.0 - w) * vg[k, j, i] + w * v_obs_a[k, j, i]
+        return U, V
+
+    # Multi-station (or station profiles)
+    if u_obs_a.ndim == 3 and u_obs_a.shape == (nz, ny, nx):
+        # Sample gridded obs at station locations
+        u_stn = np.zeros((nstn, nz), dtype=np.float64)
+        v_stn = np.zeros((nstn, nz), dtype=np.float64)
+        for s in range(nstn):
+            ii = int(np.clip(np.floor((xs[s] - xorig_m) / dgrid_m), 0, nx - 1))
+            jj = int(np.clip(np.floor((ys[s] - yorig_m) / dgrid_m), 0, ny - 1))
+            u_stn[s] = u_obs_a[:, jj, ii]
+            v_stn[s] = v_obs_a[:, jj, ii]
+    elif u_obs_a.ndim == 2 and u_obs_a.shape[0] == nstn:
+        u_stn, v_stn = u_obs_a, v_obs_a
+    elif u_obs_a.ndim == 2 and u_obs_a.shape[1] == nstn:
+        u_stn, v_stn = u_obs_a.T, v_obs_a.T
+    else:
+        raise ValueError(
+            f"u_obs shape {u_obs_a.shape} incompatible with nstn={nstn}, nz={nz}"
+        )
+
     for j in range(ny):
         for i in range(nx):
             xc = xorig_m + (i + 0.5) * dgrid_m
             yc = yorig_m + (j + 0.5) * dgrid_m
-            r2 = (xc - xs_m) ** 2 + (yc - ys_m) ** 2
+            dist2 = (xc - xs) ** 2 + (yc - ys) ** 2
             for k in range(nz):
                 rk = r1_m if k == 0 else r2_m
-                w = np.exp(-r2 / max(rk, 1.0) ** 2)
-                U[k, j, i] = (1 - w) * ug[k, j, i] + w * u_obs[k, j, i]
-                V[k, j, i] = (1 - w) * vg[k, j, i] + w * v_obs[k, j, i]
+                rmax = rmax1_m if k == 0 else rmax2_m
+                w_stn = np.exp(-dist2 / max(rk, 1.0) ** 2)
+                if rmax is not None and rmax > 0:
+                    w_stn = np.where(np.sqrt(dist2) <= rmax, w_stn, 0.0)
+                num_u = float(np.dot(w_stn, u_stn[:, k]))
+                num_v = float(np.dot(w_stn, v_stn[:, k]))
+                den = float(w_stn.sum())
+                if rprog_m and rprog_m > 0.0:
+                    wp = (rk / max(rprog_m, 1.0)) ** 2
+                    num_u += wp * ug[k, j, i]
+                    num_v += wp * vg[k, j, i]
+                    den += wp
+                if den > 1e-12:
+                    U[k, j, i] = num_u / den
+                    V[k, j, i] = num_v / den
+                # else leave IGF
     return U, V
 
 

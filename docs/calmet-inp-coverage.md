@@ -1,6 +1,6 @@
 # CALMET.INP parameter coverage (py-calmet)
 
-**Generated:** 2026-09-18 01:07 UTC (Asia/Shanghai)
+**Generated:** 2026-09-18 01:09 UTC (Asia/Shanghai)
 
 Inventory of every control-file variable recognized by Fortran `READCF` / `READFN` (and station free-form records), unioned with keys present in `cases/**/calmet.inp`, scored against current `py_calmet` behavior.
 
@@ -9,8 +9,8 @@ Inventory of every control-file variable recognized by Fortran `READCF` / `READF
 | Status | Count |
 |--------|------:|
 | **Total** | **207** |
-| Implemented | 43 |
-| Partial | 164 |
+| Implemented | 45 |
+| Partial | 162 |
 | Missing | 0 |
 
 Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.json`](calmet-inp-params.json).
@@ -206,14 +206,14 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `ISTEPPGS` | integer | Y | **Partial** | `winds.isteppgs` | NSECDT drives time; prognostic-step QA missing. |
 | `IGFMET` | integer | Y | **Partial** | `winds.igfmet` | Accepted on CalmetConfig; physics TBD. (IGF as first-guess unused.) |
 | `LVARY` | logical | Y | **Partial** | `winds.lvary` | Accepted on CalmetConfig; physics TBD. (Varying radius unused.) |
-| `RMAX1` | real | Y | **Partial** | `winds.rmax1` | Accepted on CalmetConfig; physics TBD. (OA distance cutoff unused.) |
-| `RMAX2` | real | Y | **Partial** | `winds.rmax2` | Accepted on CalmetConfig; physics TBD. (Unused.) |
+| `RMAX1` | real | Y | **Partial** | `winds.rmax1` | Accepted; optional OA cutoff in multi-station path. |
+| `RMAX2` | real | Y | **Partial** | `winds.rmax2` | Accepted; optional OA cutoff aloft. |
 | `RMAX3` | real | Y | **Partial** | `winds.rmax3` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `RMIN` | real | Y | **Partial** | `winds.rmin` | Accepted on CalmetConfig; physics TBD. (Unused.) |
 | `TERRAD` | real | Y | **Implemented** | `winds.terrad` | Terrain radius (km) for FRADJ/slope. |
-| `R1` | real | Y | **Partial** | `winds.r1` | Single-station Barnes surface radius; multi-station OA missing. |
-| `R2` | real | Y | **Partial** | `winds.r2` | Aloft OA radius; multi-station incomplete. |
-| `RPROG` | real | Y | **Partial** | `winds.rprog` | Accepted on CalmetConfig; physics TBD. (Prog weight in OA unused.) |
+| `R1` | real | Y | **Implemented** | `winds.r1` | Barnes OA surface radius (single + multi-station). |
+| `R2` | real | Y | **Implemented** | `winds.r2` | Barnes OA aloft radius (single + multi-station). |
+| `RPROG` | real | Y | **Partial** | `winds.rprog` | Accepted; wired into objective_analyze as IGF weight (0=off, golden-safe). |
 | `DIVLIM` | real | Y | **Partial** | `winds.divlim` | Accepted on CalmetConfig; physics TBD. (Divergence criterion unused (hardcoded loop).) |
 | `NITER` | integer | Y | **Partial** | `winds.niter` | Used (capped) in divergence minimization. |
 | `NSMTH` | integer (length NZ) | Y | **Implemented** | `winds.nsmth` | Per-layer 5-point smooth passes. |

@@ -884,6 +884,9 @@ def api_field(name: str, group) -> str:
 
 # --- WP1 overlays (CalmetConfig + INP round-trip + bindings) ---
 WP1_IMPLEMENTED = {
+    "R1": "Barnes OA surface radius (single + multi-station).",
+    "R2": "Barnes OA aloft radius (single + multi-station).",
+
     "JWAT1": "INP JWAT1/JWAT2 bound; effective_iwat() aliases IWAT for heatfx/slope (999→GEO 55).",
     "JWAT2": "Paired with JWAT1; see JWAT1.",
     "HA1": "Bound into shortwave_radiation from CalmetConfig.",
@@ -899,6 +902,12 @@ WP1_IMPLEMENTED = {
     "M3DDAT": "Honored via _resolve_data_file (3d.dat)."
 }
 WP1_PARTIAL = {
+    "RPROG": "Accepted; wired into objective_analyze as IGF weight (0=off, golden-safe).",
+    "RMAX1": "Accepted; optional OA cutoff in multi-station path.",
+    "RMAX2": "Accepted; optional OA cutoff aloft.",
+    "R1": "Single+multi-station Barnes OA surface radius.",
+    "R2": "Single+multi-station Barnes OA aloft radius.",
+
     "METDAT": "Parsed + exposed; output path still selected by caller/API (not auto-written to METDAT).",
     "METLST": "Parsed + exposed; list-file writer not yet implemented.",
     "LCFILES": "Parsed; paths used as-is (case folding unused).",
