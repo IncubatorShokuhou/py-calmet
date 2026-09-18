@@ -79,8 +79,11 @@ def test_jwat_alias_overrides_water_range():
 def test_check_unsupported_switches():
     cfg = CalmetConfig()
     cfg.check_unsupported()  # defaults ok
+    # IGFMET is now wired (io.igf); MM4DAT non-default is out of scope
     cfg.igfmet = 1
-    with pytest.raises(NotImplementedError, match="IGFMET"):
+    cfg.check_unsupported()  # should NOT raise
+    cfg.mm4dat = "mm5_legacy.dat"
+    with pytest.raises(NotImplementedError, match="MM4DAT"):
         cfg.check_unsupported()
 
 

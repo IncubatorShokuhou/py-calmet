@@ -19,6 +19,8 @@ from ..io.pacout import write_pacout, mixed_layer_uv
 from .met_utils import layer_mids, coriolis, utm_to_latlon
 from . import winds, pbl, clouds, precip, overwater, mixdt, barriers as barriers_mod
 from .coord import MapProjection, domain_center_latlon
+from . import run_options, zi_ops
+from ..io import igf as igf_mod
 
 
 @dataclass
@@ -117,19 +119,18 @@ def _ibtz_from_abtz(abtz: str) -> int:
     return sign * hours
 
 
-def _resolve_data_file(inputs_dir: Path, case_dir: Path, name: str | None, fallback: str) -> Path | None:
-    """Honor INP filename when present; search case_dir then inputs_dir."""
-    candidates: list[Path] = []
-    if name:
-        n = str(name).strip().strip("'\"" )
-        if n:
-            candidates.extend([case_dir / n, inputs_dir / n, Path(n)])
-    candidates.extend([case_dir / fallback, inputs_dir / fallback])
-    for c in candidates:
-        if c.is_file():
-            return c
-    return None
-
+def _resolve_data_file(
+    inputs_dir: Path,
+    case_dir: Path,
+    name: str | None,
+    fallback: str,
+    *,
+    lcfiles: bool = True,
+) -> Path | None:
+    """Honor INP filename when present; LCFILES enables case-insensitive match."""
+    return run_options.resolve_data_file(
+        inputs_dir, case_dir, name, fallback, lcfiles=lcfiles
+    )
 
 
 def _parse_surface_stations(inp, geo, nx, ny):
@@ -196,12 +197,22 @@ def run_calmet(
     cfg = getattr(inp, "config", None)
     if cfg is not None and hasattr(cfg, "check_unsupported"):
         cfg.check_unsupported()
+    run_options.reject_mm4_mm5(inp)
+    lcfiles = inp.get_bool("LCFILES", True)
+    metinp = inp.get("METINP") or "calmet.inp"
+    qa_notes: list[str] = [f"METINP={metinp}"]
+    wtdat = inp.get("WTDAT")
+    if wtdat and str(wtdat).strip().strip("'\""):
+        qa_notes.append(f"WTDAT={wtdat} ignored (use SEA.DAT / ITWPROG for water T)")
 
-    geo_path = _resolve_data_file(inputs_dir, case_dir, inp.get("GEODAT"), "geo.dat")
+    geo_path = _resolve_data_file(
+        inputs_dir, case_dir, inp.get("GEODAT"), "geo.dat", lcfiles=lcfiles
+    )
     if geo_path is None:
         raise FileNotFoundError(f"GEODAT/geo.dat not found under {case_dir} or {inputs_dir}")
     geo = read_geo(geo_path)
     nx, ny = geo.nx, geo.ny
+    qa_notes.extend(run_options.qa_grid_vs_geo(inp, geo))
     zface = np.asarray(
         inp.get_list_float("ZFACE") or [0, 20, 40, 80, 160, 300, 600, 1000, 1500],
         dtype=np.float64,
@@ -211,12 +222,24 @@ def run_calmet(
     z0 = _default_z0(geo.landuse)
     elev = geo.elev
 
-    start, _end, nhrs, nsecdt = _run_window(inp)
+    start, _end, nhrs, nsecdt = run_options.run_window_with_legacy(inp)
     ibyr, ibmo, ibdy = start.year, start.month, start.day
 
-    srf_path = _resolve_data_file(inputs_dir, case_dir, inp.get("SRFDAT"), "surf.dat")
-    up_path = _resolve_data_file(inputs_dir, case_dir, inp.get("UPDAT"), "up.dat")
-    m3d_path = _resolve_data_file(inputs_dir, case_dir, inp.get("M3DDAT"), "3d.dat")
+    srf_path = _resolve_data_file(inputs_dir, case_dir, inp.get("SRFDAT"), "surf.dat", lcfiles=lcfiles)
+    up_path = _resolve_data_file(inputs_dir, case_dir, inp.get("UPDAT"), "up.dat", lcfiles=lcfiles)
+    m3d_path = _resolve_data_file(inputs_dir, case_dir, inp.get("M3DDAT"), "3d.dat", lcfiles=lcfiles)
+    nusta = inp.get_int("NUSTA", 0)
+    nm3d = inp.get_int("NM3D", 0)
+    nigf = inp.get_int("NIGF", 0)
+    if cfg is not None:
+        up_names = run_options.multi_file_list(getattr(cfg, "updat", None), "UPDAT", inp, nusta)
+        m3d_names = run_options.multi_file_list(getattr(cfg, "m3ddat", None), "M3DDAT", inp, nm3d)
+        if len(up_names) > 1:
+            qa_notes.append(f"NUSTA={nusta} multi UP files={up_names} (using first readable)")
+        if len(m3d_names) > 1:
+            qa_notes.append(f"NM3D={nm3d} multi 3D files={m3d_names} (using first readable)")
+        if nigf > 0:
+            qa_notes.append(f"NIGF={nigf}")
 
     surf = read_surf(srf_path) if srf_path is not None and mode != "noobs" else None
     up = read_up(up_path) if up_path is not None and mode != "noobs" else None
@@ -225,7 +248,7 @@ def run_calmet(
     # Optional SEA.DAT (NOWSTA / SEADAT)
     sea_stations = []
     sea_name = inp.get("SEADAT")
-    sea_path = _resolve_data_file(inputs_dir, case_dir, sea_name, "sea.dat")
+    sea_path = _resolve_data_file(inputs_dir, case_dir, sea_name, "sea.dat", lcfiles=lcfiles)
     if sea_path is not None:
         try:
             sea_stations.append(read_sea(sea_path))
@@ -236,7 +259,7 @@ def run_calmet(
         raw = cfg.seadat
         names = raw if isinstance(raw, (list, tuple)) else [raw]
         for n in names:
-            sp = _resolve_data_file(inputs_dir, case_dir, n, "sea.dat")
+            sp = _resolve_data_file(inputs_dir, case_dir, n, "sea.dat", lcfiles=lcfiles)
             if sp is not None and (not sea_path or sp != sea_path):
                 try:
                     sea_stations.append(read_sea(sp))
@@ -245,7 +268,7 @@ def run_calmet(
 
     # Optional PRECIP.DAT
     precip_data = None
-    prc_path = _resolve_data_file(inputs_dir, case_dir, inp.get("PRCDAT"), "precip.dat")
+    prc_path = _resolve_data_file(inputs_dir, case_dir, inp.get("PRCDAT"), "precip.dat", lcfiles=lcfiles)
     if prc_path is not None:
         try:
             precip_data = read_precip(prc_path, npsta=inp.get_int("NPSTA", 0) or None)
@@ -254,7 +277,7 @@ def run_calmet(
 
     # Optional CLOUD.DAT (ICLOUD=1 / MCLOUD read path)
     cloud_data = None
-    cld_path = _resolve_data_file(inputs_dir, case_dir, inp.get("CLDDAT"), "cloud.dat")
+    cld_path = _resolve_data_file(inputs_dir, case_dir, inp.get("CLDDAT"), "cloud.dat", lcfiles=lcfiles)
     if cld_path is not None:
         try:
             cloud_data = read_cloud(cld_path, nx, ny)
@@ -273,8 +296,13 @@ def run_calmet(
         xs_km, ys_km = xs_list[isurft - 1], ys_list[isurft - 1]
 
     lat0, lon0 = _estimate_latlon(inp, geo, nx, ny)
-    fcori = coriolis(float(lat0))
-    ibtz = _ibtz_from_abtz(inp.get("ABTZ", "UTC+0000") or "UTC+0000")
+    fcori = run_options.effective_fcoriol(inp, float(lat0))
+    ibtz = run_options.ibtz_hours(inp)
+    if not inp.get("ABTZ") and inp.get_int("IBTZ", 0) == 0:
+        pass
+    elif inp.get("ABTZ"):
+        ibtz = _ibtz_from_abtz(inp.get("ABTZ", "UTC+0000") or "UTC+0000")
+    qa_notes.extend(run_options.qa_isteppgs(inp, nsecdt))
 
     constn = inp.get_float("CONSTN", 2400.0)
     zimin = inp.get_float("ZIMIN", 50.0)
@@ -284,6 +312,41 @@ def run_calmet(
     rprog_km = inp.get_float("RPROG", 0.0)
     rmax1_km = inp.get_float("RMAX1", 0.0)
     rmax2_km = inp.get_float("RMAX2", rmax1_km)
+    rmax3_km = inp.get_float("RMAX3", 0.0)
+    rmin_km = inp.get_float("RMIN", 0.1)
+    lvary = inp.get_bool("LVARY", False)
+    icalm = inp.get_int("ICALM", 0)
+    iwfcod = inp.get_int("IWFCOD", 1)
+    irad = inp.get_int("IRAD", 1)
+    irhprog = inp.get_int("IRHPROG", 0)
+    iavezi = inp.get_int("IAVEZI", 1)
+    mnmdav = inp.get_int("MNMDAV", 1)
+    hafang = inp.get_float("HAFANG", 30.0)
+    ilevzi = inp.get_int("ILEVZI", 1)
+    izicrlx = inp.get_int("IZICRLX", 1)
+    tzicrlx = inp.get_float("TZICRLX", 800.0)
+    imixh = inp.get_int("IMIXH", 1)
+    itwprog = inp.get_int("ITWPROG", 0)
+    iluoc3d = inp.get_int("ILUOC3D", 16)
+    iavet = inp.get_int("IAVET", 1)
+    tradkm = inp.get_float("TRADKM", 500.0)
+    numts = inp.get_int("NUMTS", 5)
+    nflagp = inp.get_int("NFLAGP", 2)
+    iforms = inp.get_int("IFORMS", 2)
+    igfmet = inp.get_int("IGFMET", 0)
+    lprint = inp.get_bool("LPRINT", False)
+    irtype = inp.get_int("IRTYPE", 1)
+    itest = inp.get_int("ITEST", 2)
+    mreg = inp.get_int("MREG", 0)
+    lcalgrd = inp.get_bool("LCALGRD", True)
+    idiopt1 = inp.get_int("IDIOPT1", 0)
+    idiopt2 = inp.get_int("IDIOPT2", 0)
+    idiopt3 = inp.get_int("IDIOPT3", 0)
+    idiopt4 = inp.get_int("IDIOPT4", 0)
+    idiopt5 = inp.get_int("IDIOPT5", 0)
+    zupt = inp.get_float("ZUPT", 200.0)
+    iupwnd = inp.get_int("IUPWND", -1)
+    zupwnd = inp.get_list_float("ZUPWND") or [1.0, 1000.0]
     alpha = inp.get_float("ALPHA", 0.1)
     niter = inp.get_int("NITER", 50)
     threshl = inp.get_float("THRESHL", 0.05)
@@ -341,6 +404,36 @@ def run_calmet(
     metdat_name = (inp.get("METDAT") or "CALMET.DAT")
 
     U_all, V_all = [], []
+    zi_prev = np.zeros((ny, nx), dtype=np.float64)
+    # IGF-CALMET first guess when IGFMET≠0
+    igf_data = None
+    if int(igfmet) != 0:
+        igf_name = inp.get("IGFDAT") or "igf.dat"
+        igf_path = _resolve_data_file(inputs_dir, case_dir, igf_name, "igf.dat", lcfiles=lcfiles)
+        if igf_path is not None:
+            igf_data = igf_mod.read_igf(igf_path)
+            qa_notes.append(f"IGFMET loaded {igf_path} ok={igf_data.header.ok}")
+        else:
+            qa_notes.append(f"IGFMET={igfmet} but IGFDAT not found")
+    # ITEST=1 → setup-only (return empty result after QA)
+    if int(itest) == 1:
+        qa_notes.append("ITEST=1 setup-only stop")
+        result = CalmetResult(
+            mode=mode, zface=zface,
+            U=np.zeros((0, nz, ny, nx)), V=np.zeros((0, nz, ny, nx)),
+            W=np.zeros((0, nz, ny, nx)), T=np.zeros((0, nz, ny, nx)),
+            IPGT=np.zeros((0, ny, nx), dtype=np.int32),
+            USTAR=np.zeros((0, ny, nx)), ZI=np.zeros((0, ny, nx)),
+            EL=np.zeros((0, ny, nx)), WSTAR=np.zeros((0, ny, nx)),
+            TEMPK=np.zeros((0, ny, nx)), RHO=np.zeros((0, ny, nx)),
+            QSW=np.zeros((0, ny, nx)), IRH=np.zeros((0, ny, nx), dtype=np.int32),
+            elev=elev, z0=z0,
+            meta={"qa_notes": qa_notes, "itest": 1, "nx": nx, "ny": ny, "nz": nz},
+        )
+        return result
+    us1_xy = run_options.parse_us1_coords(inp)
+    if us1_xy is not None:
+        qa_notes.append(f"US1 coords km={us1_xy}")
     IPGT_all, USTAR_all, ZI_all, EL_all, WSTAR_all = [], [], [], [], []
     TEMPK_all, RHO_all, QSW_all, IRH_all, T_all, W_all = [], [], [], [], [], []
     RMM_all = []
@@ -463,6 +556,7 @@ def run_calmet(
             else:
                 xs_m = xs_km * 1000.0
                 ys_m = ys_km * 1000.0
+            is_water = (geo.landuse >= iwat1) & (geo.landuse <= iwat2)
             U, V = winds.objective_analyze(
                 Ug,
                 Vg,
@@ -478,6 +572,11 @@ def run_calmet(
                 rprog_m=rprog_km * 1000.0,
                 rmax1_m=(rmax1_km * 1000.0) if rmax1_km > 0 else None,
                 rmax2_m=(rmax2_km * 1000.0) if rmax2_km > 0 else None,
+                rmax3_m=(rmax3_km * 1000.0) if rmax3_km > 0 else None,
+                rmin_m=(rmin_km * 1000.0) if rmin_km > 0 else 0.0,
+                lvary=bool(lvary),
+                icalm=int(icalm),
+                is_water=is_water,
                 nintr2=nintr2 or None,
                 barriers=barrier_set,
             )
@@ -501,11 +600,24 @@ def run_calmet(
                     mcloud=mcloud, icloud=icloud, sky_tenths=rec.sky, shape=(ny, nx),
                 )
 
+        # IRHPROG: RH from prognostic 3D when flag set
+        if int(irhprog) != 0 and threed is not None:
+            ti_rh = min(h, threed.rh.shape[0] - 1)
+            irh = np.zeros((ny, nx), dtype=np.int32)
+            for j in range(ny):
+                for i in range(nx):
+                    xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                    yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                    ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                    irh[j, i] = int(threed.rh[ti_rh, jj, ii, 0])
+
         # Solar / short-wave (drives daytime PBL + slope qh sign)
         sinalp = pbl.sine_solar_elevation(lat0, lon0, jday, float(hour), ibtz=ibtz)
         if np.ndim(sinalp) == 0:
             sinalp = np.full((ny, nx), float(sinalp))
         qsw = pbl.shortwave_radiation(sinalp, ccfrac, ha1=ha1, ha2=ha2, hb1=hb1, hb2=hb2)
+        if int(irad) == 0:
+            qsw = np.zeros_like(np.asarray(qsw, dtype=np.float64))
 
         # surface thermo for flux
         if mode == "noobs":
@@ -515,6 +627,11 @@ def run_calmet(
             rec_h = surf.records[min(h, len(surf.records) - 1)]
             rho = pbl.air_density(temp2d, rec_h.pres)
             pres_mb = rec_h.pres
+
+        # IAVET / TRADKM / NUMTS temperature smoother (no-op when NUMTS<=1)
+        temp2d = run_options.average_temperature(
+            temp2d, iavet=iavet, tradkm=tradkm, dgridkm=geo.dgridkm, numts=numts
+        )
 
         # Energy-budget qh for slope-flow sign (HEATFX). Full PBL after DIAGNO.
         qh_eb = pbl.heat_flux_energy_budget(
@@ -526,8 +643,13 @@ def run_calmet(
         daytime = bool(np.any(day_cell))
 
         # --- DIAGNO-ish adjustments (order mirrors CALMET DIAGNO) ---
+        # IWFCOD=0 → skip diagnostic wind module (keep first-guess / OA)
+        if int(iwfcod) == 0:
+            pass
+        elif False:
+            pass
         # 1) Froude blocking (IFRADJ)
-        if ifradj == 1:
+        if int(iwfcod) != 0 and ifradj == 1:
             # stable lapse proxy ~0.01 K/m when night; weaker by day
             gamma = 0.01 if not daytime else 0.005
             U, V = winds.froude_adjust(
@@ -535,7 +657,7 @@ def run_calmet(
             )
         # 2) Kinematic TOPOF2 W + optional minim (IKINE); O'Brien after smooth
         W_topo = None
-        if ikine == 1:
+        if int(iwfcod) != 0 and ikine == 1:
             gamma_k = 0.01 if not daytime else 0.005
             W_topo = winds.topographic_kinematic_w(
                 U, V, elev, zface, temp2d, dgrid_m, alpha=alpha, gamma=gamma_k
@@ -544,7 +666,7 @@ def run_calmet(
                 U, V, dgrid_m, niter=min(niter, 30), divlim=divlim, W=W_topo, zface=zface
             )
         # 3) Slope flow
-        if islope == 1:
+        if int(iwfcod) != 0 and islope == 1:
             Us, Vs = winds.slope_flow(
                 elev,
                 dgrid_m,
@@ -562,7 +684,7 @@ def run_calmet(
         # 4) Horizontal smoothing
         U, V = winds.smooth_winds(U, V, nsmth=nsmth)
         # 5) Optional O'Brien after smooth
-        if iobr == 1:
+        if int(iwfcod) != 0 and iobr == 1:
             W_pre = winds.vertical_velocity_from_div(U, V, zface, dgrid_m)
             if W_topo is not None:
                 W_pre = W_pre + W_topo
@@ -657,6 +779,12 @@ def run_calmet(
             )
             zi_n = pbl.mixht_night(ustar, el, fcori, constn, zimin, zimax)
             zi = np.where(day_cell, zi_d, zi_n)
+            # IMIXH=±3: Holzworth dry-adiabatic intercept (land convective)
+            if abs(int(imixh)) == 3 and snd_z is not None and snd_t is not None:
+                zi_h = zi_ops.mixht_holzworth(
+                    temp2d, snd_z, snd_t, zimin=zimin, zimax=zimax
+                )
+                zi = np.where(day_cell, zi_h, zi)
             ziconv = np.where(day_cell, ziconv, 0.0)
             dptt_prev = np.where(day_cell, dptt_prev, 0.0)
         else:
@@ -668,6 +796,24 @@ def run_calmet(
         # local T/ustar; this 0.2%-scale term is retained for golden parity).
         zi = zi * (1.0 + 0.002 * (elev - elev.mean()) / max(float(elev.std()), 1.0))
         zi = np.clip(zi, zimin, zimax)
+        # IAVEZI spatial average (no-op when MNMDAV<=1); IZICRLX relaxation
+        zi = zi_ops.average_zi_upwind(
+            zi, U, V, iavezi=iavezi, mnmdav=mnmdav, hafang=hafang, ilevzi=ilevzi
+        )
+        zi = zi_ops.relax_zi(
+            zi, zi_prev,
+            izicrlx=izicrlx, tzicrlx=tzicrlx, dt_sec=float(nsecdt),
+            daytime=locals().get('day_cell', True),
+        )
+        zi_prev = zi.copy()
+        zi = np.clip(zi, zimin, zimax)
+
+        # IRTYPE=0 → winds-only: collapse PBL diagnostics to minima
+        if int(irtype) == 0:
+            zi = np.full_like(zi, zimin)
+            ustar = np.full_like(ustar, 0.05)
+            el = np.full_like(el, -1e5)
+            wstar = np.zeros_like(wstar)
 
         # Overwater COARE-lite when ICOARE≠0 and overwater stations/SEA path
         # engaged (NOWSTA>0 or SEA.DAT present). Goldens use NOWSTA=0 → land PBL.
@@ -724,7 +870,10 @@ def run_calmet(
             jday_p = int(step_t.strftime("%j"))
             if precip_data is not None:
                 rates = rates_for_hour(precip_data, ibyr, jday_p, hour, missing=0.0)
-                stn_rmm = np.asarray(rates[: len(ps_xs)], dtype=np.float64)
+                stn_rmm = run_options.apply_nflagp(
+                    np.asarray(rates[: len(ps_xs)], dtype=np.float64),
+                    nflagp, cutp=cutp,
+                )
                 if stn_rmm.size < len(ps_xs):
                     stn_rmm = np.pad(stn_rmm, (0, len(ps_xs) - stn_rmm.size))
             else:
@@ -798,10 +947,27 @@ def run_calmet(
             "iformo": iformo,
             "ioutmm5": int(getattr(threed, "ioutmm5", 92)) if threed is not None else None,
             "pmap": MapProjection.from_inp(inp).pmap,
+            "qa_notes": qa_notes,
+            "lcfiles": lcfiles,
+            "iwfcod": iwfcod,
+            "irad": irad,
+            "irhprog": irhprog,
+            "iavezi": iavezi,
+            "izicrlx": izicrlx,
+            "igfmet": igfmet,
+            "lcalgrd": lcalgrd,
+            "irtype": irtype,
+            "mreg": mreg,
+            "iforms": iforms,
+            "nflagp": nflagp,
         },
     )
 
     if write_outputs:
+        # DIAG/PROG/TST* stubs when LDB or LDBCST
+        if inp.get_bool("LDB", False) or inp.get_bool("LDBCST", False):
+            written = run_options.write_test_stubs(case_dir, inp, enabled=True)
+            qa_notes.extend(f"stub {w}" for w in written)
         # METLST list-file hook
         metlst_name = inp.get("METLST")
         if metlst_name:
@@ -824,12 +990,41 @@ def run_calmet(
                     "ICOARE": icoare,
                     "NPSTA": npsta,
                     "IFORMO": iformo,
+                    "IWFCOD": iwfcod,
+                    "IRAD": irad,
+                    "IRHPROG": irhprog,
+                    "IAVEZI": iavezi,
+                    "IMIXH": imixh,
+                    "IGFMET": igfmet,
+                    "LCALGRD": lcalgrd,
+                    "IRTYPE": irtype,
+                    "MREG": mreg,
                     "NBAR": inp.get_int("NBAR", 0),
                     "LLBREZE": inp.get_bool("LLBREZE", False),
                 },
-                notes=[
+                notes=qa_notes + [
                     "List file written by py-calmet (not bit-identical to Fortran METLST).",
                 ],
+                lprint=bool(lprint),
+                ipr_flags={f"IPR{i}": inp.get_int(f"IPR{i}", 0) for i in range(9)},
+                print_fields={
+                    "STABILITY": inp.get_bool("STABILITY", True),
+                    "USTAR": inp.get_bool("USTAR", True),
+                    "MONIN": inp.get_bool("MONIN", True),
+                    "MIXHT": inp.get_bool("MIXHT", True),
+                    "WSTAR": inp.get_bool("WSTAR", True),
+                    "SENSHEAT": inp.get_bool("SENSHEAT", True),
+                    "CONVZI": inp.get_bool("CONVZI", True),
+                },
+                field_samples={
+                    "ZI": result.ZI,
+                    "USTAR": result.USTAR,
+                    "TEMPK": result.TEMPK,
+                    "QSW": result.QSW,
+                } if (lprint or any(inp.get_int(f"IPR{i}", 0) for i in range(9))) else None,
+                iuvout=inp.get_list_int("IUVOUT") or None,
+                iwout=inp.get_list_int("IWOUT") or None,
+                itout=inp.get_list_int("ITOUT") or None,
             )
             result.meta["metlst"] = str(lst_path)
 

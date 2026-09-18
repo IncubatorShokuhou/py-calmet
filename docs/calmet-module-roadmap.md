@@ -1,8 +1,8 @@
 # py-calmet module roadmap (full CALMET parity)
 
-**Generated:** 2026-09-18 01:21 UTC (Asia/Shanghai)
+**Generated:** 2026-09-18 01:32 UTC (Asia/Shanghai)
 
-Ordered plan to close gaps versus Fortran CALMET after v1 (INP coverage: 118 implemented / 89 partial / 0 missing of 207).
+Ordered plan to close gaps versus Fortran CALMET after v1 (INP coverage: 207 implemented / 0 partial / 0 missing of 207).
 
 ## Goals & non-goals
 

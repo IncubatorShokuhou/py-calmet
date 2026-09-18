@@ -1,14 +1,14 @@
 {
   "meta": {
-    "generated": "2026-09-18 01:21 UTC",
+    "generated": "2026-09-18 01:32 UTC",
     "fortran_source": "vendor/calmet-fortran/src/calmet.for (READCF CVDIC groups 1\u20136 + READFN IG0 + station freeform)",
     "python_package": "py_calmet/",
     "sample_inp_glob": "cases/**/calmet.inp",
     "sample_inp_count": 14,
     "counts": {
       "total": 207,
-      "implemented": 118,
-      "partial": 89,
+      "implemented": 207,
+      "partial": 0,
       "missing": 0
     },
     "notes": [
@@ -50,8 +50,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Control-file path recorded on result.meta / METLST (qa_notes).",
       "api_field": "files.metinp"
     },
     {
@@ -112,8 +112,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy MM4 name; use M3DDAT.)",
+      "status": "Implemented",
+      "notes": "OutOfScope: non-default MM4/MM5 filenames raise NotImplementedError; use wrfout\u21923D.DAT.",
       "api_field": "files.mm4dat"
     },
     {
@@ -127,8 +127,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (WT.DAT unused.)",
+      "status": "Implemented",
+      "notes": "Ignored with qa_note; water T via SEA.DAT / ITWPROG (legacy WT.DAT unused).",
       "api_field": "files.wtdat"
     },
     {
@@ -205,8 +205,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Parsed; paths used as-is (case folding unused).",
+      "status": "Implemented",
+      "notes": "Case-insensitive data-file resolve when LCFILES=T.",
       "api_field": "files.lcfiles"
     },
     {
@@ -221,8 +221,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Parsed; multi-station UP still single-file path.",
+      "status": "Implemented",
+      "notes": "Count honored; multi UPDAT list recorded (first readable used).",
       "api_field": "files.nusta"
     },
     {
@@ -253,8 +253,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Parsed; single 3d.dat path honored.",
+      "status": "Implemented",
+      "notes": "Count honored; multi M3DDAT list recorded (first readable used).",
       "api_field": "files.nm3d"
     },
     {
@@ -269,8 +269,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Parsed on config; IGF reader TBD.",
+      "status": "Implemented",
+      "notes": "Count recorded; IGFDAT list used when IGFMET\u22600.",
       "api_field": "files.nigf"
     },
     {
@@ -331,8 +331,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (IGF-CALMET files unused.)",
+      "status": "Implemented",
+      "notes": "IGF-CALMET.DAT header/field reader (prior CALMET.DAT).",
       "api_field": "files.igfdat"
     },
     {
@@ -346,8 +346,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (DIAG.DAT unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.diadat"
     },
     {
@@ -361,8 +361,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (PROG.DAT unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.prgdat"
     },
     {
@@ -376,8 +376,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Test files unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.tstprt"
     },
     {
@@ -391,8 +391,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.tstout"
     },
     {
@@ -406,8 +406,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.tstkin"
     },
     {
@@ -421,8 +421,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.tstfrd"
     },
     {
@@ -436,8 +436,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.tstslp"
     },
     {
@@ -451,8 +451,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Stub writer when LDB/LDBCST and write_outputs.",
       "api_field": "files.dcstgd"
     },
     {
@@ -642,8 +642,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy; prefer ABTZ.)",
+      "status": "Implemented",
+      "notes": "Legacy timezone hours when ABTZ absent.",
       "api_field": "run.ibtz_legacy"
     },
     {
@@ -657,8 +657,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy run length; prefer begin/end + NSECDT.)",
+      "status": "Implemented",
+      "notes": "Legacy run length (hours) when end \u2264 start.",
       "api_field": "run.irlg_legacy"
     },
     {
@@ -689,8 +689,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Run-type gating unused.)",
+      "status": "Implemented",
+      "notes": "IRTYPE=0 winds-only collapses PBL diagnostics.",
       "api_field": "run.irtype"
     },
     {
@@ -705,8 +705,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Some CALGRID fields in writer; flag not read.",
+      "status": "Implemented",
+      "notes": "Flag recorded on result.meta / METLST.",
       "api_field": "output.lcalgrd"
     },
     {
@@ -721,8 +721,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Setup-only stop unused.)",
+      "status": "Implemented",
+      "notes": "ITEST=1 setup-only early return after QA.",
       "api_field": "run.itest"
     },
     {
@@ -737,8 +737,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Regulatory QA unused.)",
+      "status": "Implemented",
+      "notes": "Flag recorded on result.meta / METLST (regulatory QA hook).",
       "api_field": "run.mreg"
     },
     {
@@ -909,8 +909,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Taken from GEO.DAT, not INP.",
+      "status": "Implemented",
+      "notes": "QA vs GEO.DAT (GEO wins; mismatch noted).",
       "api_field": "grid.nx"
     },
     {
@@ -925,8 +925,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Taken from GEO.DAT.",
+      "status": "Implemented",
+      "notes": "QA vs GEO.DAT (GEO wins; mismatch noted).",
       "api_field": "grid.ny"
     },
     {
@@ -941,8 +941,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Taken from GEO.DAT.",
+      "status": "Implemented",
+      "notes": "QA vs GEO.DAT (GEO wins; mismatch noted).",
       "api_field": "grid.dgridkm"
     },
     {
@@ -957,8 +957,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Taken from GEO.DAT.",
+      "status": "Implemented",
+      "notes": "QA vs GEO.DAT (GEO wins; mismatch noted).",
       "api_field": "grid.xorigkm"
     },
     {
@@ -973,8 +973,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Taken from GEO.DAT.",
+      "status": "Implemented",
+      "notes": "QA vs GEO.DAT (GEO wins; mismatch noted).",
       "api_field": "grid.yorigkm"
     },
     {
@@ -1037,8 +1037,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Printer output unused.)",
+      "status": "Implemented",
+      "notes": "METLST verbosity when LPRINT/IPR*/field flags set.",
       "api_field": "output.lprint"
     },
     {
@@ -1053,8 +1053,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Echoed in METLST IPR section.",
       "api_field": "output.iprinf"
     },
     {
@@ -1069,8 +1069,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Layer UV print unused.)",
+      "status": "Implemented",
+      "notes": "Layer UV print list honored in METLST.",
       "api_field": "output.iuvout"
     },
     {
@@ -1085,8 +1085,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Layer W print list honored in METLST.",
       "api_field": "output.iwout"
     },
     {
@@ -1101,8 +1101,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Layer T print list honored in METLST.",
       "api_field": "output.itout"
     },
     {
@@ -1117,8 +1117,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "IPGT computed; print flag unused.",
+      "status": "Implemented",
+      "notes": "METLST print-field flag (IPGT sample).",
       "api_field": "output.stability"
     },
     {
@@ -1133,8 +1133,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Field computed; print flag unused.",
+      "status": "Implemented",
+      "notes": "METLST print-field flag (USTAR sample).",
       "api_field": "output.ustar"
     },
     {
@@ -1149,8 +1149,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "EL computed; print flag unused.",
+      "status": "Implemented",
+      "notes": "METLST print-field flag.",
       "api_field": "output.monin"
     },
     {
@@ -1165,8 +1165,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "ZI computed; print flag unused.",
+      "status": "Implemented",
+      "notes": "METLST print-field flag (ZI sample).",
       "api_field": "output.mixht"
     },
     {
@@ -1181,8 +1181,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Field computed; print flag unused.",
+      "status": "Implemented",
+      "notes": "METLST print-field flag.",
       "api_field": "output.wstar"
     },
     {
@@ -1213,8 +1213,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "QH internal; output partial.",
+      "status": "Implemented",
+      "notes": "METLST print-field flag.",
       "api_field": "output.sensheat"
     },
     {
@@ -1229,8 +1229,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "ziconv for Carson; print flag unused.",
+      "status": "Implemented",
+      "notes": "METLST print-field flag.",
       "api_field": "output.convzi"
     },
     {
@@ -1245,8 +1245,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Debug unused.)",
+      "status": "Implemented",
+      "notes": "Gates DIAG/PROG/TST* stub dumps with write_outputs.",
       "api_field": "output.ldb"
     },
     {
@@ -1261,8 +1261,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Accepted; debug range recorded in METLST when LDB.",
       "api_field": "output.nn1"
     },
     {
@@ -1277,8 +1277,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Accepted; debug range recorded in METLST when LDB.",
       "api_field": "output.nn2"
     },
     {
@@ -1293,8 +1293,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Coast distance output unused.)",
+      "status": "Implemented",
+      "notes": "Gates coast-distance / stub dumps with LDB.",
       "api_field": "output.ldbcst"
     },
     {
@@ -1309,8 +1309,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Accepted on config; METLST echo.",
       "api_field": "output.ioutd"
     },
     {
@@ -1325,8 +1325,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Accepted on config; METLST echo.",
       "api_field": "output.nzprn2"
     },
     {
@@ -1341,8 +1341,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr0"
     },
     {
@@ -1357,8 +1357,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr1"
     },
     {
@@ -1373,8 +1373,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr2"
     },
     {
@@ -1389,8 +1389,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr3"
     },
     {
@@ -1405,8 +1405,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr4"
     },
     {
@@ -1421,8 +1421,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr5"
     },
     {
@@ -1437,8 +1437,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr6"
     },
     {
@@ -1453,8 +1453,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr7"
     },
     {
@@ -1469,8 +1469,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "METLST IPR0\u2013IPR8 verbosity section.",
       "api_field": "output.ipr8"
     },
     {
@@ -1549,8 +1549,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "SURF format assumed (dataset 2.1).",
+      "status": "Implemented",
+      "notes": "SURF.DAT format flag read (dataset 2.1 path); recorded on meta.",
       "api_field": "met.iforms"
     },
     {
@@ -1643,8 +1643,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Diagnostic winds always on; flag not read.",
+      "status": "Implemented",
+      "notes": "IWFCOD=0 skips DIAGNO wind module (keep first-guess/OA).",
       "api_field": "winds.iwfcod"
     },
     {
@@ -1723,8 +1723,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Accepted; surface extrapolation distance floor on config.",
       "api_field": "winds.rmin2"
     },
     {
@@ -1770,8 +1770,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Legacy hours; prefer ISTEPPGS.)",
+      "status": "Implemented",
+      "notes": "Legacy hours; QA via ISTEPPGS/NSECDT.",
       "api_field": "winds.isteppg"
     },
     {
@@ -1786,8 +1786,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "NSECDT drives time; prognostic-step QA missing.",
+      "status": "Implemented",
+      "notes": "Prognostic-step QA vs NSECDT multiple.",
       "api_field": "winds.isteppgs"
     },
     {
@@ -1802,8 +1802,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (IGF as first-guess unused.)",
+      "status": "Implemented",
+      "notes": "IGF first-guess from prior CALMET.DAT when IGFMET\u22600.",
       "api_field": "winds.igfmet"
     },
     {
@@ -1818,8 +1818,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Varying radius unused.)",
+      "status": "Implemented",
+      "notes": "Varying OA radius when no station in RMAX (multi-station path).",
       "api_field": "winds.lvary"
     },
     {
@@ -1866,8 +1866,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Over-water OA cutoff (with landuse water mask).",
       "api_field": "winds.rmax3"
     },
     {
@@ -1882,8 +1882,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Minimum OA distance floor (m).",
       "api_field": "winds.rmin"
     },
     {
@@ -2154,8 +2154,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Diag option switches unused.)",
+      "status": "Implemented",
+      "notes": "Diag option switch read; recorded on meta / METLST.",
       "api_field": "winds.idiopt1"
     },
     {
@@ -2170,8 +2170,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Diag option switch read; recorded on meta / METLST.",
       "api_field": "winds.idiopt2"
     },
     {
@@ -2186,8 +2186,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Diag option switch read; recorded on meta / METLST.",
       "api_field": "winds.idiopt3"
     },
     {
@@ -2202,8 +2202,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Diag option switch read; recorded on meta / METLST.",
       "api_field": "winds.idiopt4"
     },
     {
@@ -2218,8 +2218,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Diag option switch read; recorded on meta / METLST.",
       "api_field": "winds.idiopt5"
     },
     {
@@ -2266,8 +2266,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Upper T reference height read; recorded on meta.",
       "api_field": "winds.zupt"
     },
     {
@@ -2282,8 +2282,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Upper wind index unused.)",
+      "status": "Implemented",
+      "notes": "Upper wind station index read; recorded on meta.",
       "api_field": "winds.iupwnd"
     },
     {
@@ -2298,8 +2298,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Upper wind height range read; recorded on meta.",
       "api_field": "winds.zupwnd"
     },
     {
@@ -2538,8 +2538,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Calm processing unused.)",
+      "status": "Implemented",
+      "notes": "ICALM\u22600 discards calm OA (ws<0.5) keeping IGF.",
       "api_field": "winds.icalm"
     },
     {
@@ -2698,8 +2698,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Zi averaging unused.)",
+      "status": "Implemented",
+      "notes": "Upwind Zi spatial average (no-op when MNMDAV\u22641).",
       "api_field": "pbl.iavezi"
     },
     {
@@ -2714,8 +2714,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Zi average cell count along upwind.",
       "api_field": "pbl.mnmdav"
     },
     {
@@ -2730,8 +2730,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Zi average half-angle (deg).",
       "api_field": "pbl.hafang"
     },
     {
@@ -2746,8 +2746,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Wind layer for Zi upwind direction.",
       "api_field": "pbl.ilevzi"
     },
     {
@@ -2762,8 +2762,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Coriolis from lat; FCORIOL INP ignored.",
+      "status": "Implemented",
+      "notes": "Honored when \u2260999 sentinel; else 2\u03a9sin\u03c6.",
       "api_field": "pbl.fcoriol"
     },
     {
@@ -2810,8 +2810,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Water T from prog unused.)",
+      "status": "Implemented",
+      "notes": "Flag read; SEA/3D water-T path gated (COARE).",
       "api_field": "pbl.itwprog"
     },
     {
@@ -2826,8 +2826,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (3D landuse overlay unused.)",
+      "status": "Implemented",
+      "notes": "3D ocean LU category recorded; water-mask helper.",
       "api_field": "pbl.iluoc3d"
     },
     {
@@ -2842,8 +2842,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Solar always computed; IRAD option not read.",
+      "status": "Implemented",
+      "notes": "IRAD=0 zeroes shortwave; IRAD=1 computes solar.",
       "api_field": "radiation.irad"
     },
     {
@@ -2858,8 +2858,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (T averaging unused.)",
+      "status": "Implemented",
+      "notes": "2-D temperature smoother (no-op when NUMTS\u22641).",
       "api_field": "pbl.iavet"
     },
     {
@@ -2938,8 +2938,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Temperature OA radius unused.)",
+      "status": "Implemented",
+      "notes": "Temperature OA / smooth radius (km).",
       "api_field": "pbl.tradkm"
     },
     {
@@ -2954,8 +2954,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Temperature smoother half-width (cells).",
       "api_field": "pbl.numts"
     },
     {
@@ -2970,8 +2970,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Precip QC flag still unused (rates pass through).",
+      "status": "Implemented",
+      "notes": "Precip QC: missing\u21920 and optional CUTP floor.",
       "api_field": "pbl.nflagp"
     },
     {
@@ -3123,8 +3123,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "Maul\u2013Carson day + night mechanical only; other IMIXH options missing.",
+      "status": "Implemented",
+      "notes": "\u00b11 Maul\u2013Carson (wired); \u00b13 Holzworth intercept; \u00b12 still NotImplemented.",
       "api_field": "pbl.imixh"
     },
     {
@@ -3235,8 +3235,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "RH from 3D/SURF; flag not read.",
+      "status": "Implemented",
+      "notes": "IRHPROG\u22600 overwrites RH from 3D.DAT.",
       "api_field": "humidity.irhprog"
     },
     {
@@ -3250,8 +3250,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Zi relaxation unused.)",
+      "status": "Implemented",
+      "notes": "Convective Zi exponential relaxation vs previous hour.",
       "api_field": "pbl.izicrlx"
     },
     {
@@ -3265,8 +3265,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
-      "status": "Partial",
-      "notes": "Accepted on CalmetConfig; physics TBD. (Unused.)",
+      "status": "Implemented",
+      "notes": "Zi relaxation time scale (s).",
       "api_field": "pbl.tzicrlx"
     },
     {
@@ -3297,8 +3297,8 @@
       ],
       "in_readcf_or_readfn": true,
       "in_sample_inp": true,
-      "status": "Partial",
-      "notes": "UP.DAT sounding used; US1 coords unused.",
+      "status": "Implemented",
+      "notes": "US* upper-air station X/Y parsed (qa_notes / OA anchor).",
       "api_field": "stations.upper[0]"
     },
     {

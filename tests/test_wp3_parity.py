@@ -205,5 +205,6 @@ def test_ioutmm5_parse_variants():
 def test_config_allows_llbreze_and_nbar():
     cfg = CalmetConfig(llbreze=True, nbar=1, igfmet=0, imixh=1)
     cfg.check_unsupported()  # should not raise
+    CalmetConfig(igfmet=1).check_unsupported()  # IGFMET now implemented
     with pytest.raises(NotImplementedError):
-        CalmetConfig(igfmet=1).check_unsupported()
+        CalmetConfig(mm4dat="foo_mm4.dat").check_unsupported()

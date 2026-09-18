@@ -326,10 +326,16 @@ class CalmetConfig:
 
     def check_unsupported(self) -> None:
         """Raise NotImplementedError for switches that would silently wrong-result."""
-        if int(self.igfmet) != 0:
-            raise NotImplementedError('IGFMET!=0 (IGF first-guess) is not implemented')
+        # IGFMET: wired via io.igf (prior CALMET.DAT); no longer a hard stop
         if abs(int(self.imixh)) == 2:
             raise NotImplementedError('IMIXH=±2 (Batchvarova–Gryning) is not implemented')
+        # MM4DAT: out of scope — reject non-default MM4/MM5 filenames
+        mm4 = str(self.mm4dat or "").strip().lower()
+        if mm4 and mm4 not in {"mm4.dat", "mm5.dat", ""}:
+            if "mm4" in mm4 or "mm5" in mm4:
+                raise NotImplementedError(
+                    f"MM4DAT={self.mm4dat!r} out of scope; use wrfout→3D.DAT"
+                )
         # LLBREZE / NBAR: implemented in core.barriers (wired by runner when set)
 
 

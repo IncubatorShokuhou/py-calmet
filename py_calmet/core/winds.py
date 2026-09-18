@@ -188,6 +188,11 @@ def objective_analyze(
     rprog_m: float = 0.0,
     rmax1_m: float | None = None,
     rmax2_m: float | None = None,
+    rmax3_m: float | None = None,
+    rmin_m: float = 0.0,
+    lvary: bool = False,
+    icalm: int = 0,
+    is_water: np.ndarray | None = None,
     nintr2: list[int] | np.ndarray | None = None,
     barriers=None,
     xorig_km: float | None = None,
@@ -268,9 +273,26 @@ def objective_analyze(
             for k in range(nz):
                 rk = r1_m if k == 0 else r2_m
                 rmax = rmax1_m if k == 0 else rmax2_m
-                w_stn = np.exp(-dist2 / max(rk, 1.0) ** 2)
+                # RMAX3: over-water cells use alternate cutoff when provided
+                if (
+                    is_water is not None
+                    and rmax3_m is not None
+                    and rmax3_m > 0
+                    and bool(is_water[j, i])
+                ):
+                    rmax = rmax3_m
+                dist = np.sqrt(dist2)
+                # RMIN: floor distance to avoid singularity at station
+                dist_w = np.maximum(dist, float(rmin_m) if rmin_m and rmin_m > 0 else 0.0)
+                w_stn = np.exp(-(dist_w ** 2) / max(rk, 1.0) ** 2)
                 if rmax is not None and rmax > 0:
-                    w_stn = np.where(np.sqrt(dist2) <= rmax, w_stn, 0.0)
+                    w_stn = np.where(dist <= rmax, w_stn, 0.0)
+                    # LVARY: expand radius until at least one station weighs in
+                    if lvary and not np.any(w_stn > 0) and dist.size:
+                        order = np.argsort(dist)
+                        keep = order[: max(1, min(3, dist.size))]
+                        w_stn = np.zeros_like(w_stn)
+                        w_stn[keep] = np.exp(-(dist_w[keep] ** 2) / max(rk, 1.0) ** 2)
                 if barriers is not None:
                     from .barriers import station_clear_mask
                     x0k = (xorig_m / 1000.0) if xorig_km is None else xorig_km
@@ -298,8 +320,15 @@ def objective_analyze(
                     num_v += wp * vg[k, j, i]
                     den += wp
                 if den > 1e-12:
-                    U[k, j, i] = num_u / den
-                    V[k, j, i] = num_v / den
+                    u_oa = num_u / den
+                    v_oa = num_v / den
+                    if int(icalm) != 0:
+                        # ICALM≠0: discard calm obs contributions (ws < 0.5 m/s)
+                        spd_oa = (u_oa ** 2 + v_oa ** 2) ** 0.5
+                        if spd_oa < 0.5:
+                            continue  # keep IGF
+                    U[k, j, i] = u_oa
+                    V[k, j, i] = v_oa
                 # else leave IGF
     return U, V
 
