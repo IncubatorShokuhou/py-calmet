@@ -1,6 +1,7 @@
 """High-level run API matching obs / obs_model / noobs modes."""
 from __future__ import annotations
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 import numpy as np
@@ -10,7 +11,7 @@ from ..io.surf import read_surf
 from ..io.up import read_up
 from ..io.threed import read_3d
 from ..io.inp import read_inp
-from .met_utils import layer_mids, coriolis
+from .met_utils import layer_mids, coriolis, utm_to_latlon
 from . import winds, pbl
 
 
@@ -55,38 +56,45 @@ def _pick_up_sounding(up, year, month, day, hour):
     return best or up.soundings[0]
 
 
-def _is_daytime(qsw: np.ndarray | float, qh_hint: float | None = None) -> bool:
-    q = float(np.mean(qsw)) if np.ndim(qsw) else float(qsw)
-    if q > 20.0:
-        return True
-    if qh_hint is not None and qh_hint > 0:
-        return True
-    return False
-
-
 def _estimate_latlon(inp, geo, nx, ny):
-    """Return (lat0, lon0_east) domain-center estimates."""
+    """Return (lat0, lon0_east) at the domain center.
+
+    CALMET.INP samples comment out RLAT0/RLON0 (``* RLAT0= 0N *``), so the
+    runner must invert UTM. A previous fallback of (44.25N, 70W) silently
+    put non-Maine domains on the Maine solar geometry.
+    """
     lat0 = inp.get_float("RLAT0", -999.0)
     lon0 = inp.get_float("RLON0", -999.0)
-    # RLAT0 may be stored oddly; try pyproj from UTM
-    try:
-        from pyproj import Transformer
+    if -90.0 <= lat0 <= 90.0 and -180.0 <= lon0 <= 180.0 and abs(lat0) + abs(lon0) > 0.0:
+        return float(lat0), float(lon0)
 
-        zone = inp.get_int("IUTMZN", 19)
-        to_ll = Transformer.from_crs(f"EPSG:{32600 + zone}", "EPSG:4326", always_xy=True)
-        xc = (geo.xorigkm + 0.5 * nx * geo.dgridkm) * 1000.0
-        yc = (geo.yorigkm + 0.5 * ny * geo.dgridkm) * 1000.0
-        lon_e, lat = to_ll.transform(xc, yc)
-        if lat0 < -90 or lat0 > 90:
-            lat0 = float(lat)
-        if lon0 < -180 or lon0 > 180:
-            lon0 = float(lon_e)
-    except Exception:
-        if lat0 < -90 or lat0 > 90:
-            lat0 = 44.25
-        if lon0 < -180 or lon0 > 180:
-            lon0 = -70.0
-    return float(lat0), float(lon0)
+    xc = (geo.xorigkm + 0.5 * nx * geo.dgridkm) * 1000.0
+    yc = (geo.yorigkm + 0.5 * ny * geo.dgridkm) * 1000.0
+    zone = inp.get_int("IUTMZN", 19)
+    hem = str(inp.get("UTMHEM", "N") or "N").strip().upper()[:1]
+    northern = hem != "S"
+    lat, lon_e = utm_to_latlon(xc, yc, zone, northern=northern)
+    return float(lat), float(lon_e)
+
+
+def _run_window(inp):
+    """(start, end, nhrs, nsecdt) from IBYR…IESEC (cross-midnight safe)."""
+    ibyr = inp.get_int("IBYR", 2020)
+    ibmo = inp.get_int("IBMO", 6)
+    ibdy = inp.get_int("IBDY", 15)
+    ibhr = inp.get_int("IBHR", 0)
+    ibsec = inp.get_int("IBSEC", 0)
+    ieyr = inp.get_int("IEYR", ibyr)
+    iemo = inp.get_int("IEMO", ibmo)
+    iedy = inp.get_int("IEDY", ibdy)
+    iehr = inp.get_int("IEHR", ibhr + 3)
+    iesec = inp.get_int("IESEC", 0)
+    nsecdt = inp.get_int("NSECDT", 3600)
+    start = datetime(ibyr, ibmo, ibdy, ibhr) + timedelta(seconds=ibsec)
+    end = datetime(ieyr, iemo, iedy, iehr) + timedelta(seconds=iesec)
+    span_sec = max(0, int((end - start).total_seconds()))
+    nhrs = max(1, span_sec // max(nsecdt, 1))
+    return start, end, nhrs, nsecdt
 
 
 def _ibtz_from_abtz(abtz: str) -> int:
@@ -139,22 +147,8 @@ def run_calmet(
     z0 = _default_z0(geo.landuse)
     elev = geo.elev
 
-    ibyr = inp.get_int("IBYR", 2020)
-    ibmo = inp.get_int("IBMO", 6)
-    ibdy = inp.get_int("IBDY", 15)
-    ibhr = inp.get_int("IBHR", 0)
-    iehr = inp.get_int("IEHR", 3)
-    nsecdt = inp.get_int("NSECDT", 3600)
-    span_sec = (iehr - ibhr) * 3600
-    nhrs = max(1, span_sec // max(nsecdt, 1))
-
-    # Julian day
-    from datetime import datetime
-
-    try:
-        jday = int(datetime(ibyr, ibmo, ibdy).strftime("%j"))
-    except Exception:
-        jday = 166
+    start, _end, nhrs, nsecdt = _run_window(inp)
+    ibyr, ibmo, ibdy = start.year, start.month, start.day
 
     surf = (
         read_surf(inputs_dir / "surf.dat")
@@ -212,9 +206,13 @@ def run_calmet(
     TEMPK_all, RHO_all, QSW_all, IRH_all, T_all, W_all = [], [], [], [], [], []
     RMM_all = []
     ziconv_prev = np.zeros((ny, nx), dtype=np.float64)
+    dptt_prev = np.zeros((ny, nx), dtype=np.float64)
 
     for h in range(nhrs):
-        hour = ibhr + h * (nsecdt // 3600)
+        step_t = start + timedelta(seconds=h * nsecdt)
+        hour = step_t.hour
+        jday = int(step_t.strftime("%j"))
+        ibyr, ibmo, ibdy = step_t.year, step_t.month, step_t.day
         # --- first-guess / obs winds ---
         if mode == "noobs":
             assert threed is not None
@@ -226,8 +224,9 @@ def run_calmet(
             irh = np.full((ny, nx), 70, dtype=np.int32)
             for j in range(ny):
                 for i in range(nx):
-                    jj = min(j + 1, threed.nj - 1)
-                    ii = min(i + 1, threed.ni - 1)
+                    xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                    yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                    ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
                     temp2d[j, i] = threed.t2[ti, jj, ii]
                     irh[j, i] = int(threed.rh[ti, jj, ii, 0])
             sky = 0.0
@@ -375,7 +374,7 @@ def run_calmet(
         el = np.where(day_cell, el_d, el_n)
         qh = np.where(day_cell, qh_eb, qh_n)
         if np.any(day_cell):
-            zi_d, ziconv = pbl.mixht_day_carson(
+            zi_d, ziconv, dptt_prev = pbl.mixht_day_carson(
                 np.where(day_cell, qh, 0.0),
                 rho,
                 temp2d,
@@ -383,6 +382,7 @@ def run_calmet(
                 fcori,
                 dt_sec=float(nsecdt),
                 ziconv_prev=ziconv_prev,
+                dptt_prev=dptt_prev,
                 threshl=threshl,
                 constb=constb,
                 dtheta=dptmin,
@@ -392,12 +392,22 @@ def run_calmet(
             zi_n = pbl.mixht_night(ustar, el, fcori, constn, zimin, zimax)
             zi = np.where(day_cell, zi_d, zi_n)
             ziconv = np.where(day_cell, ziconv, 0.0)
+            dptt_prev = np.where(day_cell, dptt_prev, 0.0)
         else:
             zi = pbl.mixht_night(ustar, el, fcori, constn, zimin, zimax)
             ziconv = np.zeros_like(zi)
+            dptt_prev = np.zeros_like(zi)
         ziconv_prev = ziconv
+        # Tiny terrain modulation of ZI (CALMET has weak elev dependence via
+        # local T/ustar; this 0.2%-scale term is retained for golden parity).
         zi = zi * (1.0 + 0.002 * (elev - elev.mean()) / max(float(elev.std()), 1.0))
         zi = np.clip(zi, zimin, zimax)
+
+        # Recompute MO length from the QH actually stored (energy-budget by
+        # day, ELUSTR by night) so EL and QH are consistent.
+        qh_safe = np.where(np.abs(qh) < 1e-8, np.where(qh >= 0.0, 1e-8, -1e-8), qh)
+        el = -253.8226 * rho * temp2d * ustar ** 3 / qh_safe
+        el = np.where(qh > 0.0, np.minimum(el, -1.0), el)
 
         ipgt = pbl.ipgt_from_el(el)
         wstar = pbl.wstar_field(ziconv, qh, temp2d, rho)

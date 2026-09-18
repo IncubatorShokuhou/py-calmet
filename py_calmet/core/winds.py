@@ -1,8 +1,25 @@
 """Diagnostic wind construction (interp, OA, slope flow, mass consistency)."""
 from __future__ import annotations
 import numpy as np
-from .met_utils import wind_uv, ZO_EXTRAP, layer_mids, G, CP
-from .similt import similt_profile
+from .met_utils import wind_uv, ZO_EXTRAP, layer_mids
+
+
+def _nearest_3d_index(
+    x_km: float,
+    y_km: float,
+    threed,
+    dgrid_km: float,
+) -> tuple[int, int]:
+    """Nearest 3D.DAT mass point for a CALMET cell-center (km)."""
+    dx = float(getattr(threed, "dx_km", 0.0) or dgrid_km)
+    dx = max(dx, 1e-6)
+    x0 = float(getattr(threed, "x0_km", x_km - dx))
+    y0 = float(getattr(threed, "y0_km", y_km - dx))
+    ii = int(np.round((x_km - x0) / dx - 0.5))
+    jj = int(np.round((y_km - y0) / dx - 0.5))
+    ii = int(np.clip(ii, 0, threed.ni - 1))
+    jj = int(np.clip(jj, 0, threed.nj - 1))
+    return ii, jj
 
 
 def interp_3d_to_calmet(
@@ -15,7 +32,11 @@ def interp_3d_to_calmet(
     dgrid_km: float,
     hour_index: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Map 3D.DAT winds onto CALMET layers (RDMM5-style log below first level)."""
+    """Map 3D.DAT winds onto CALMET layers (RDMM5-style log below first level).
+
+    Horizontal mapping uses geographic cell centers vs 3D.DAT origin/spacing
+    (the common 1-cell MM5 halo is a special case of this, not a hardcoded +1).
+    """
     zmid = layer_mids(zface)
     nz = len(zmid)
     U = np.zeros((nz, ny, nx), dtype=np.float64)
@@ -23,8 +44,9 @@ def interp_3d_to_calmet(
     t = hour_index
     for j in range(ny):
         for i in range(nx):
-            ii = min(i + 1, threed.ni - 1)
-            jj = min(j + 1, threed.nj - 1)
+            xc = xorig_km + (i + 0.5) * dgrid_km
+            yc = yorig_km + (j + 0.5) * dgrid_km
+            ii, jj = _nearest_3d_index(xc, yc, threed, dgrid_km)
             elev = float(threed.elev[jj, ii])
             zs = threed.height_msl[t, jj, ii, :] - elev
             zs = np.maximum.accumulate(np.maximum(zs, 1.0))
@@ -62,7 +84,13 @@ def obs_profile_similt(
     ny: int,
     p_exp: float = 0.17,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Obs vertical profile: power-law speed + UA direction blend."""
+    """Obs vertical profile: power-law speed + UA direction blend.
+
+    ``z0`` / ``el`` / ``zi`` / ``zimin`` are kept for API compatibility with a
+    future SIMILT path (``core.similt.similt_profile``). v1 goldens were tuned
+    against this power-law blend, so SIMILT is not wired in here.
+    """
+    _ = (z0, el, zi, zimin)
     zmid = layer_mids(zface)
     z_agl = np.array([lev.height - stn_elev for lev in sounding_levels], dtype=np.float64)
     wd = np.array([lev.wd for lev in sounding_levels], dtype=np.float64)
@@ -73,7 +101,8 @@ def obs_profile_similt(
     z_agl, wd, ws = z_agl[mask], wd[mask], ws[mask]
     uu, vv = wind_uv(wd, ws)
     ws1 = float(np.hypot(u_sfc, v_sfc))
-    wd_sfc = float(np.rad2deg(np.arctan2(-u_sfc, -v_sfc)) % 360.0)
+    u_s = float(u_sfc / max(ws1, 1e-6))
+    v_s = float(v_sfc / max(ws1, 1e-6))
     U = np.zeros((len(zmid), ny, nx))
     V = np.zeros_like(U)
     for L, zm in enumerate(zmid):
@@ -84,10 +113,14 @@ def obs_profile_similt(
         u_ua = float(np.interp(zm, z_agl, uu))
         v_ua = float(np.interp(zm, z_agl, vv))
         spd_ua = float(np.hypot(u_ua, v_ua))
-        w = min(1.0, np.log(zm / z_anem) / np.log(80.0))
+        w = min(1.0, np.log(max(zm, z_anem) / z_anem) / np.log(80.0))
         spd = (1.0 - 0.4 * w) * spd + 0.4 * w * spd_ua
-        wd_a = float(np.interp(zm, z_agl, wd))
-        wdir = (1.0 - w) * wd_sfc + w * wd_a
+        # Blend direction on unit vectors so 350° vs 10° does not go the long way.
+        u_a = u_ua / max(spd_ua, 1e-6)
+        v_a = v_ua / max(spd_ua, 1e-6)
+        bu = (1.0 - w) * u_s + w * u_a
+        bv = (1.0 - w) * v_s + w * v_a
+        wdir = float(np.rad2deg(np.arctan2(-bu, -bv)) % 360.0)
         u, v = wind_uv(wdir, spd)
         U[L] = u
         V[L] = v
