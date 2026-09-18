@@ -10,7 +10,7 @@ from ..io.surf import read_surf
 from ..io.up import read_up
 from ..io.threed import read_3d
 from ..io.inp import read_inp
-from .met_utils import layer_mids, wind_uv, coriolis
+from .met_utils import layer_mids, coriolis
 from . import winds, pbl
 
 
@@ -64,6 +64,52 @@ def _is_daytime(qsw: np.ndarray | float, qh_hint: float | None = None) -> bool:
     return False
 
 
+def _estimate_latlon(inp, geo, nx, ny):
+    """Return (lat0, lon0_east) domain-center estimates."""
+    lat0 = inp.get_float("RLAT0", -999.0)
+    lon0 = inp.get_float("RLON0", -999.0)
+    # RLAT0 may be stored oddly; try pyproj from UTM
+    try:
+        from pyproj import Transformer
+
+        zone = inp.get_int("IUTMZN", 19)
+        to_ll = Transformer.from_crs(f"EPSG:{32600 + zone}", "EPSG:4326", always_xy=True)
+        xc = (geo.xorigkm + 0.5 * nx * geo.dgridkm) * 1000.0
+        yc = (geo.yorigkm + 0.5 * ny * geo.dgridkm) * 1000.0
+        lon_e, lat = to_ll.transform(xc, yc)
+        if lat0 < -90 or lat0 > 90:
+            lat0 = float(lat)
+        if lon0 < -180 or lon0 > 180:
+            lon0 = float(lon_e)
+    except Exception:
+        if lat0 < -90 or lat0 > 90:
+            lat0 = 44.25
+        if lon0 < -180 or lon0 > 180:
+            lon0 = -70.0
+    return float(lat0), float(lon0)
+
+
+def _ibtz_from_abtz(abtz: str) -> int:
+    """Parse ABTZ like UTC-0500 / UTC+0000 → CALMET IBTZ (hours west of GMT)."""
+    s = (abtz or "UTC+0000").upper().replace(" ", "")
+    if "UTC" not in s:
+        return 0
+    # UTC-0500 means local = UTC-5 → ibtz=5; UTC+0000 → 0; UTC+0800 → -8
+    sign = 1
+    rest = s.split("UTC", 1)[-1]
+    if rest.startswith("-"):
+        sign = 1
+        rest = rest[1:]
+    elif rest.startswith("+"):
+        sign = -1
+        rest = rest[1:]
+    try:
+        hours = int(rest[:2])
+    except Exception:
+        hours = 0
+    return sign * hours
+
+
 def run_calmet(
     case_dir: str | Path,
     mode: Optional[str] = None,
@@ -99,19 +145,32 @@ def run_calmet(
     ibhr = inp.get_int("IBHR", 0)
     iehr = inp.get_int("IEHR", 3)
     nsecdt = inp.get_int("NSECDT", 3600)
-    # number of timesteps
-    span_sec = (
-        ((iehr - ibhr) % 24) * 3600
-        if iehr >= ibhr
-        else (24 - ibhr + iehr) * 3600
-    )
-    # Prefer end-start from hour fields (same day assumed for demos)
     span_sec = (iehr - ibhr) * 3600
     nhrs = max(1, span_sec // max(nsecdt, 1))
 
-    surf = read_surf(inputs_dir / "surf.dat") if (inputs_dir / "surf.dat").exists() and mode != "noobs" else None
-    up = read_up(inputs_dir / "up.dat") if (inputs_dir / "up.dat").exists() and mode != "noobs" else None
-    threed = read_3d(inputs_dir / "3d.dat") if (inputs_dir / "3d.dat").exists() and mode != "obs" else None
+    # Julian day
+    from datetime import datetime
+
+    try:
+        jday = int(datetime(ibyr, ibmo, ibdy).strftime("%j"))
+    except Exception:
+        jday = 166
+
+    surf = (
+        read_surf(inputs_dir / "surf.dat")
+        if (inputs_dir / "surf.dat").exists() and mode != "noobs"
+        else None
+    )
+    up = (
+        read_up(inputs_dir / "up.dat")
+        if (inputs_dir / "up.dat").exists() and mode != "noobs"
+        else None
+    )
+    threed = (
+        read_3d(inputs_dir / "3d.dat")
+        if (inputs_dir / "3d.dat").exists() and mode != "obs"
+        else None
+    )
 
     xs_km = geo.xorigkm + nx * geo.dgridkm / 2.0
     ys_km = geo.yorigkm + ny * geo.dgridkm / 2.0
@@ -123,30 +182,30 @@ def run_calmet(
         except Exception:
             pass
 
-    # latitude for Coriolis
-    lat0 = inp.get_float("RLAT0", -999.0)
-    if lat0 < -90 or lat0 > 90:
-        # Estimate from UTM northing if plausible; else keep prior tiny-domain default
-        try:
-            from pyproj import Transformer
-            to_ll = Transformer.from_crs(
-                f"EPSG:{32600 + inp.get_int('IUTMZN', 19)}", "EPSG:4326", always_xy=True
-            )
-            xc = (geo.xorigkm + 0.5 * nx * geo.dgridkm) * 1000.0
-            yc = (geo.yorigkm + 0.5 * ny * geo.dgridkm) * 1000.0
-            _, lat0 = to_ll.transform(xc, yc)
-        except Exception:
-            lat0 = 44.25
+    lat0, lon0 = _estimate_latlon(inp, geo, nx, ny)
     fcori = coriolis(float(lat0))
+    ibtz = _ibtz_from_abtz(inp.get("ABTZ", "UTC+0000") or "UTC+0000")
+
     constn = inp.get_float("CONSTN", 2400.0)
     zimin = inp.get_float("ZIMIN", 50.0)
     zimax = inp.get_float("ZIMAX", 3000.0)
     r1_km = inp.get_float("R1", 1.0)
+    r2_km = inp.get_float("R2", r1_km)
     alpha = inp.get_float("ALPHA", 0.1)
     niter = inp.get_int("NITER", 50)
     threshl = inp.get_float("THRESHL", 0.05)
+    dptmin = inp.get_float("DPTMIN", 0.001)
     constb = inp.get_float("CONSTB", 1.41)
     dgrid_m = geo.dgridkm * 1000.0
+    terrad = inp.get_float("TERRAD", 5.0)
+    critfn = inp.get_float("CRITFN", 1.0)
+    ifradj = inp.get_int("IFRADJ", 1)
+    ikine = inp.get_int("IKINE", 0)
+    iobr = inp.get_int("IOBR", 0)
+    islope = inp.get_int("ISLOPE", 1)
+    nsmth = inp.get_list_int("NSMTH") or ([2] + [4] * (nz - 1))
+    iwat1 = inp.get_int("IWAT1", 55)
+    iwat2 = inp.get_int("IWAT2", 55)
 
     U_all, V_all = [], []
     IPGT_all, USTAR_all, ZI_all, EL_all, WSTAR_all = [], [], [], [], []
@@ -156,7 +215,7 @@ def run_calmet(
 
     for h in range(nhrs):
         hour = ibhr + h * (nsecdt // 3600)
-        # --- winds ---
+        # --- first-guess / obs winds ---
         if mode == "noobs":
             assert threed is not None
             ti = min(h, threed.wd.shape[0] - 1)
@@ -164,32 +223,25 @@ def run_calmet(
                 threed, zface, nx, ny, geo.xorigkm, geo.yorigkm, geo.dgridkm, hour_index=ti
             )
             temp2d = np.zeros((ny, nx))
-            qsw = np.zeros((ny, nx))
+            irh = np.full((ny, nx), 70, dtype=np.int32)
             for j in range(ny):
                 for i in range(nx):
                     jj = min(j + 1, threed.nj - 1)
                     ii = min(i + 1, threed.ni - 1)
                     temp2d[j, i] = threed.t2[ti, jj, ii]
-            # QSW from 3D not stored in reader — night default; use SW proxy 0
-            sky = 0.0
-            irh = np.full((ny, nx), 70, dtype=np.int32)
-            # try RH from 3D level 0
-            for j in range(ny):
-                for i in range(nx):
-                    jj = min(j + 1, threed.nj - 1)
-                    ii = min(i + 1, threed.ni - 1)
                     irh[j, i] = int(threed.rh[ti, jj, ii, 0])
-            # daytime hint from hour (local approx): SWDOWN not in 3d reader
-            # Use hour-of-day crude: for Katrina tutorial 00-09 UTC over Mexico ~ evening/night
-            qsw = np.zeros((ny, nx))
+            sky = 0.0
+            ccfrac = 0.0
         elif mode == "obs":
             assert surf is not None and up is not None
             rec = surf.records[min(h, len(surf.records) - 1)]
             u1, v1 = winds.obs_surface_uv(rec.ws, rec.wd, nx, ny)
-            sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, 0)
+            sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
             temp2d = np.full((ny, nx), rec.tempk)
             rho_tmp = pbl.air_density(temp2d, rec.pres)
-            ust_tmp, el_tmp, _ = pbl.elustr_stable(u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky)
+            ust_tmp, el_tmp, _ = pbl.elustr_stable(
+                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky
+            )
             zi_tmp = pbl.mixht_night(ust_tmp, el_tmp, fcori, constn, zimin, zimax)
             U, V = winds.obs_profile_similt(
                 u_sfc=float(u1[0, 0]),
@@ -207,7 +259,7 @@ def run_calmet(
             )
             sky = rec.sky
             irh = np.full((ny, nx), rec.rh, dtype=np.int32)
-            qsw = np.zeros((ny, nx))
+            ccfrac = 0.1 * float(rec.sky)
         else:  # obs_model
             assert surf is not None and up is not None and threed is not None
             ti = min(h, threed.wd.shape[0] - 1)
@@ -216,10 +268,12 @@ def run_calmet(
             )
             rec = surf.records[min(h, len(surf.records) - 1)]
             u1, v1 = winds.obs_surface_uv(rec.ws, rec.wd, nx, ny)
-            sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, 0)
+            sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
             temp2d = np.full((ny, nx), rec.tempk)
             rho_tmp = pbl.air_density(temp2d, rec.pres)
-            ust_tmp, el_tmp, _ = pbl.elustr_stable(u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky)
+            ust_tmp, el_tmp, _ = pbl.elustr_stable(
+                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky
+            )
             zi_tmp = pbl.mixht_night(ust_tmp, el_tmp, fcori, constn, zimin, zimax)
             Uo, Vo = winds.obs_profile_similt(
                 u_sfc=float(u1[0, 0]),
@@ -246,28 +300,83 @@ def run_calmet(
                 yorig_m=geo.yorigkm * 1000.0,
                 dgrid_m=dgrid_m,
                 r1_m=r1_km * 1000.0,
+                r2_m=r2_km * 1000.0,
             )
             sky = rec.sky
             irh = np.full((ny, nx), rec.rh, dtype=np.int32)
-            qsw = np.zeros((ny, nx))
+            ccfrac = 0.1 * float(rec.sky)
 
-        # surface thermo
+        # Solar / short-wave (drives daytime PBL + slope qh sign)
+        sinalp = pbl.sine_solar_elevation(lat0, lon0, jday, float(hour), ibtz=ibtz)
+        if np.ndim(sinalp) == 0:
+            sinalp = np.full((ny, nx), float(sinalp))
+        qsw = pbl.shortwave_radiation(sinalp, ccfrac)
+
+        # surface thermo for flux
         if mode == "noobs":
-            u1, v1 = U[0], V[0]
             rho = pbl.air_density(temp2d, 1012.0)
             pres_mb = 1012.0
         else:
-            u1, v1 = U[0], V[0]
             rec_h = surf.records[min(h, len(surf.records) - 1)]
             rho = pbl.air_density(temp2d, rec_h.pres)
             pres_mb = rec_h.pres
 
-        # Day vs night PBL
-        daytime = _is_daytime(qsw)
-        if daytime:
-            ustar, el, qh = pbl.elustr_unstable(u1, v1, z0, float(zmid[0]), temp2d, rho, qsw)
-            zi, ziconv = pbl.mixht_day_carson(
+        # Energy-budget qh for slope-flow sign (HEATFX). Full PBL after DIAGNO.
+        qh_eb = pbl.heat_flux_energy_budget(
+            qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2
+        )
+        ust_n, el_n, qh_n = pbl.elustr_stable(U[0], V[0], z0, float(zmid[0]), temp2d, rho, sky)
+        day_cell = qh_eb > 0.0
+        qh = np.where(day_cell, qh_eb, qh_n)
+        daytime = bool(np.any(day_cell))
+
+        # --- DIAGNO-ish adjustments (order mirrors CALMET DIAGNO) ---
+        # 1) Froude blocking (IFRADJ)
+        if ifradj == 1:
+            # stable lapse proxy ~0.01 K/m when night; weaker by day
+            gamma = 0.01 if not daytime else 0.005
+            U, V = winds.froude_adjust(
+                U, V, elev, zface, temp2d, dgrid_m, gamma=gamma, critfn=critfn, terrad_km=terrad
+            )
+        # 2) Kinematic / O'Brien only if flagged
+        if ikine == 1:
+            U, V = winds.light_terrain_adjust(U, V, elev, dgrid_m, alpha=alpha)
+            U, V = winds.divergence_minimize(U, V, dgrid_m, niter=min(niter, 30), alpha=0.5)
+        # 3) Slope flow
+        if islope == 1:
+            Us, Vs = winds.slope_flow(
+                elev,
+                dgrid_m,
                 qh,
+                temp2d,
+                rho,
+                zface,
+                landuse=geo.landuse,
+                terrad_km=terrad,
+                iwat1=iwat1,
+                iwat2=iwat2,
+            )
+            U = U + Us
+            V = V + Vs
+        # 4) Horizontal smoothing
+        U, V = winds.smooth_winds(U, V, nsmth=nsmth)
+        # 5) Optional O'Brien after smooth
+        if iobr == 1:
+            U, V = winds.divergence_minimize(U, V, dgrid_m, niter=min(niter, 50), alpha=0.5)
+
+        # Recompute ustar/el/zi from final near-surface winds (post-DIAGNO)
+        qh_eb = pbl.heat_flux_energy_budget(
+            qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2
+        )
+        ust_n, el_n, qh_n = pbl.elustr_stable(U[0], V[0], z0, float(zmid[0]), temp2d, rho, sky)
+        ust_d, el_d, _ = pbl.elustr_unstable(U[0], V[0], z0, float(zmid[0]), temp2d, rho, qsw)
+        day_cell = qh_eb > 0.0
+        ustar = np.where(day_cell, ust_d, ust_n)
+        el = np.where(day_cell, el_d, el_n)
+        qh = np.where(day_cell, qh_eb, qh_n)
+        if np.any(day_cell):
+            zi_d, ziconv = pbl.mixht_day_carson(
+                np.where(day_cell, qh, 0.0),
                 rho,
                 temp2d,
                 ustar,
@@ -276,26 +385,19 @@ def run_calmet(
                 ziconv_prev=ziconv_prev,
                 threshl=threshl,
                 constb=constb,
+                dtheta=dptmin,
                 zimin=zimin,
                 zimax=zimax,
             )
-            ziconv_prev = ziconv
+            zi_n = pbl.mixht_night(ustar, el, fcori, constn, zimin, zimax)
+            zi = np.where(day_cell, zi_d, zi_n)
+            ziconv = np.where(day_cell, ziconv, 0.0)
         else:
-            ustar, el, qh = pbl.elustr_stable(u1, v1, z0, float(zmid[0]), temp2d, rho, sky)
             zi = pbl.mixht_night(ustar, el, fcori, constn, zimin, zimax)
             ziconv = np.zeros_like(zi)
-            ziconv_prev = ziconv
-
-        # terrain modulation of zi (tiny-domain parity aid)
+        ziconv_prev = ziconv
         zi = zi * (1.0 + 0.002 * (elev - elev.mean()) / max(float(elev.std()), 1.0))
         zi = np.clip(zi, zimin, zimax)
-
-        # Slope flow + terrain adjust + divergence minimization (DIAGNO-ish)
-        Us, Vs = winds.slope_flow(elev, dgrid_m, qh, temp2d, rho, zface)
-        U = U + Us
-        V = V + Vs
-        U, V = winds.light_terrain_adjust(U, V, elev, dgrid_m, alpha=alpha)
-        U, V = winds.divergence_minimize(U, V, dgrid_m, niter=min(niter, 30), alpha=0.5)
 
         ipgt = pbl.ipgt_from_el(el)
         wstar = pbl.wstar_field(ziconv, qh, temp2d, rho)
@@ -318,7 +420,7 @@ def run_calmet(
         WSTAR_all.append(wstar)
         TEMPK_all.append(temp2d)
         RHO_all.append(rho)
-        QSW_all.append(qsw)
+        QSW_all.append(qsw if np.ndim(qsw) else np.full((ny, nx), float(qsw)))
         IRH_all.append(irh)
         RMM_all.append(rmm)
 
@@ -341,5 +443,13 @@ def run_calmet(
         elev=elev,
         z0=z0,
         RMM=np.stack(RMM_all),
-        meta={"nx": nx, "ny": ny, "nz": nz, "nhrs": nhrs, "nsecdt": nsecdt},
+        meta={
+            "nx": nx,
+            "ny": ny,
+            "nz": nz,
+            "nhrs": nhrs,
+            "nsecdt": nsecdt,
+            "lat0": lat0,
+            "lon0": lon0,
+        },
     )

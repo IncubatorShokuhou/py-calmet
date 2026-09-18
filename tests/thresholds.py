@@ -4,9 +4,10 @@ Synthetic tiny-domain gates use relative RMSE
   relative RMSE = sqrt(mean(((pred-ref)/(|ref|+eps))^2))
 with eps=1e-6.
 
-The wrf_demo case (complex terrain, ~28 km, synthesized obs) uses looser
-relative-RMSE gates plus Pearson correlation floors for U/V, because a full
-DIAGNO/OA port is still approximate on this domain.
+The wrf_demo case (complex terrain, ~28 km) uses floored relative RMSE
+(floor=0.5 m/s on U/V) plus Pearson correlation floors, because raw
+relative RMSE is dominated by near-zero reference cells even when
+absolute errors are ~0.5–1.3 m/s.
 """
 
 # relative RMSE = sqrt(mean(((pred-ref)/(|ref|+eps))^2))
@@ -40,33 +41,44 @@ THRESH = {
     },
 }
 
-# wrf_demo: intentionally looser (documented)
+# wrf_demo: floored relative RMSE (see WRF_DEMO_UV_FLOOR) + correlation
+WRF_DEMO_UV_FLOOR = 0.5  # m/s
 WRF_DEMO_THRESH = {
     "obs": {
-        "U": 5.0,
-        "V": 15.0,
-        "U_corr": 0.30,
-        "V_corr": 0.30,
-        "ZI": 1.0,
-        "USTAR": 1.5,
-        "SPD": 2.0,
+        "U": 1.2,
+        "V": 2.0,
+        "U_corr": 0.40,
+        "V_corr": 0.55,
+        "ZI": 0.50,
+        "USTAR": 0.80,
+        "SPD": 1.5,
     },
     "obs_model": {
-        "U": 20.0,
-        "V": 50.0,
-        "U_corr": 0.40,
-        "V_corr": 0.50,
-        "ZI": 2.0,
-        "USTAR": 3.0,
-        "SPD": 2.0,
+        "U": 0.80,
+        "V": 2.0,
+        "U_corr": 0.90,
+        "V_corr": 0.90,
+        "ZI": 1.0,
+        "USTAR": 1.5,
+        "SPD": 1.0,
     },
     "noobs": {
-        "U": 20.0,
-        "V": 50.0,
-        "U_corr": 0.50,
-        "V_corr": 0.60,
-        "ZI": 2.0,
-        "USTAR": 3.0,
-        "SPD": 2.0,
+        "U": 0.80,
+        "V": 2.0,
+        "U_corr": 0.90,
+        "V_corr": 0.90,
+        "ZI": 1.0,
+        "USTAR": 1.5,
+        "SPD": 1.0,
     },
+}
+
+# daytime_zi: Maul–Carson path (simplified gamma=DPTMIN; growth faster than
+# Fortran sounding-based lapse). Gate on QSW, ZI correlation, convective flags.
+DAYTIME_ZI_THRESH = {
+    "QSW": 0.05,
+    "ZI_corr_day": 0.90,
+    "ZI_night": 0.15,
+    "U": 0.05,
+    "V": 0.05,
 }

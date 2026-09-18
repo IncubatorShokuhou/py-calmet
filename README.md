@@ -2,15 +2,33 @@
 
 Pure-NumPy diagnostic meteorological downscaling inspired by CALMET (CALPUFF system).
 
-## Status
+## Status — v1 complete
 
-**v0.1.0** — expanded diagnostic core + CALMET.DAT/NetCDF writers + `wrf_demo` case
-from a public NCAR Katrina tutorial wrfout.
+**v1.0.0** — diagnostic core with Fortran-aligned DIAGNO steps (Froude, slope,
+NSMTH smooth), Maul–Carson daytime ZI, CALMET.DAT/NetCDF writers, and two golden
+suites (`small_domain`, `wrf_demo`) plus a daytime convective ZI golden.
 
-| Case | Grid | Modes |
-|------|------|-------|
-| `cases/small_domain` | 12×12 @ 1 km, synthetic | `obs` / `obs_model` / `noobs` |
-| `cases/wrf_demo` | 12×12 @ ~28 km, NCAR wrfout subset | `obs` / `obs_model` / `noobs` |
+| Case | Grid | Modes | Notes |
+|------|------|-------|-------|
+| `cases/small_domain` | 12×12 @ 1 km, synthetic | `obs` / `obs_model` / `noobs` | Tight relative-RMSE gates |
+| `cases/wrf_demo` | 12×12 @ ~28 km, NCAR Katrina wrfout | `obs` / `obs_model` / `noobs` | Floored U/V RMSE + correlation |
+| `cases/daytime_zi` | 12×12 @ 1 km, hours 00–17 UTC | `noobs` | Carson/MIXHMC daytime path |
+
+### v1 complete
+
+- Readers + writers: GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT / NetCDF
+- Winds: 3D→CALMET interp, SIMILT profiles, Barnes OA (R1/R2), **FRADJ**, **slope flow** (Mahrt/cdk=0.08), **NSMTH** smooth; **IOBR/IKINE-gated** divergence minimization
+- PBL: night ELUSTR+MIXHT; **daytime energy-budget QH + Maul–Carson ZI**; solar/QSW
+- Golden parity: tiny-domain tight; wrf_demo U/V corr ≳ 0.97 (noobs); daytime ZI corr ≳ 0.99 vs Fortran shape
+
+### Explicitly deferred to v2
+
+- Full DIAGNO OA multi-station / RPROG blending refinements beyond single-station Barnes
+- Sounding-based lapse rates above ZI (MIXDT) — daytime growth uses DPTMIN gamma
+- IOUTMM5 variants beyond format 92; full cloud schemes (MCLOUD 2/3/4 detail)
+- Overwater **COARE** fluxes / OCD marine mixing heights
+- IKINE topographic vertical velocity + full O'Brien (IOBR=1) production tuning
+- Raw wrfout in git (rebuild from NCAR tutorial; see `cases/wrf_demo/README.md`)
 
 ## Install
 
@@ -40,17 +58,15 @@ python scripts/wrfout_to_3d.py path/to/wrfout_d01 -o 3d.dat --i0 4 --j0 0 --ni 1
 ## Package layout
 
 - `py_calmet/io/` — GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT **readers + writers**, NetCDF writer
-- `py_calmet/core/` — diagnostic winds (3D interp, SIMILT, OA, **slope flow**, **divergence minimization**, kinematic W) + PBL (**night + daytime Carson**)
+- `py_calmet/core/` — diagnostic winds + PBL (night + daytime Carson)
 - `scripts/wrfout_to_3d.py` — wrfout NetCDF → 3D.DAT
-- `tests/` — reader smoke, synthetic golden parity, wrf_demo parity, physics/writer unit tests
-- `cases/small_domain/goldens/` — synthetic Fortran goldens
-- `cases/wrf_demo/` — public wrfout-based case (see `cases/wrf_demo/README.md`)
+- `tests/` — reader smoke, golden parity, wrf_demo, daytime_zi, physics/writer unit tests
 
 ## Parity thresholds
 
 Relative RMSE gates live in `tests/thresholds.py`. Tiny-domain core U/V/ZI/USTAR
-remain tight (~1e-2). `wrf_demo` uses looser relative-RMSE gates plus U/V correlation
-floors (complex terrain; DIAGNO still approximate).
+remain tight (~1e-2–1e-1). `wrf_demo` uses **floored** relative RMSE (0.5 m/s floor
+on U/V) plus correlation floors. `daytime_zi` gates QSW, night ZI, and daytime ZI correlation.
 
 ## License / attribution
 

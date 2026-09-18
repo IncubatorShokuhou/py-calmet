@@ -24,8 +24,19 @@ def layer_mids(zface: np.ndarray) -> np.ndarray:
     return 0.5 * (zface[:-1] + zface[1:])
 
 
-def relative_rmse(pred: np.ndarray, ref: np.ndarray, eps: float = 1e-6) -> float:
-    return float(np.sqrt(np.mean(((pred - ref) / (np.abs(ref) + eps)) ** 2)))
+def relative_rmse(
+    pred: np.ndarray,
+    ref: np.ndarray,
+    eps: float = 1e-6,
+    floor: float | None = None,
+) -> float:
+    """Relative RMSE. Optional ``floor`` clamps |ref| in the denominator
+    (useful on coarse complex-terrain fields where |ref|≈0 inflates the metric).
+    """
+    denom = np.abs(ref) + eps
+    if floor is not None:
+        denom = np.maximum(denom, floor)
+    return float(np.sqrt(np.mean(((pred - ref) / denom) ** 2)))
 
 
 def max_rel_err(pred: np.ndarray, ref: np.ndarray, eps: float = 1e-6) -> float:

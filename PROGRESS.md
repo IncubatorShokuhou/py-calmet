@@ -1,58 +1,69 @@
 # PROGRESS — py-calmet
 
-**Updated:** 2026-09-18 08:20 CST (Asia/Shanghai)
+**Updated:** 2026-09-18 00:26 UTC (Asia/Shanghai)
 
-## Done
+## Done (v1)
 
-- [x] Pure-NumPy package (`py_calmet`) v0.1.0
-- [x] Readers: GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT
-- [x] **Writers:** CALMET.DAT (round-trip tested) + NetCDF
-- [x] Diagnostic core: obs / obs_model / noobs
-- [x] **Slope flow** (Allwine–Whiteman / Horst–Doran style) + **divergence minimization**
-- [x] **Kinematic W** from horizontal divergence
-- [x] PBL: nighttime ELUSTR + MIXHT; **daytime Carson convective ZI** + unstable ELUSTR
-- [x] Output fields exercised: U,V,W,T,IPGT,USTAR,ZI,EL,WSTAR,TEMPK,RHO,QSW,IRH,RMM
-- [x] Public wrfout demo case (`cases/wrf_demo`) from NCAR Katrina tutorial
-- [x] WRF → 3D.DAT converter (`scripts/wrfout_to_3d.py`)
-- [x] Three Fortran goldens on wrf_demo (obs / obs_model / noobs)
-- [x] pytest green — **21 passed**
+- [x] Pure-NumPy package (`py_calmet`)
+- [x] Readers + writers (CALMET.DAT round-trip, NetCDF)
+- [x] DIAGNO-aligned winds: FRADJ, Mahrt slope (cdk=0.08), NSMTH, IOBR/IKINE gating
+- [x] PBL: night + daytime energy-budget QH + Maul–Carson (MIXHMC) ZI + solar/QSW
+- [x] `wrf_demo` NCAR Katrina case; `daytime_zi` convective golden (00–17 UTC)
+- [x] pytest green — **23 passed**
 - [x] Pushed Python-only tree (no `vendor/` / Fortran / raw wrfout)
 
 ## pytest
 
 ```
-21 passed
+23 passed
 ```
 
 Repo: https://github.com/IncubatorShokuhou/py-calmet
 
-### Measured relative RMSE — small_domain (tight gates)
+### Measured — small_domain (unchanged tight gates)
 
 | Mode | U | V | ZI | USTAR | SPD |
 |------|------|------|------|-------|------|
-| obs | ~0.07 | ~0.10 | ~0.01 | ~0.001 | ~0.02 |
-| obs_model | ~0.08 | ~0.02 | ~0.08 | ~0.04 | ~0.05 |
-| noobs | ~0.02 | ~0.02 | ~0.07 | ~0.02 | ~0.003 |
+| obs | ~0.072 | ~0.102 | ~0.012 | ~0.003 | ~0.024 |
+| obs_model | ~0.081 | ~0.016 | ~0.069 | ~0.036 | ~0.042 |
+| noobs | ~0.019 | ~0.016 | ~0.063 | ~0.019 | ~0.001 |
 
-### Measured — wrf_demo (looser gates + correlation)
+### Measured — wrf_demo **before → after** DIAGNO fix
 
-| Mode | U rel | V rel | U corr | V corr | ZI rel | USTAR rel |
-|------|-------|-------|--------|--------|--------|-----------|
-| obs | ~1.2 | ~7.5 | ≥0.3 | ≥0.3 | ~0.34 | ~0.48 |
-| obs_model | ~8.5 | ~37 | ≥0.4 | ≥0.5 | ~0.81 | ~1.4 |
-| noobs | ~8.5 | ~41 | ~0.73 | ~0.85 | ~0.88 | ~1.4 |
+| Mode | metric | before | after |
+|------|--------|--------|-------|
+| noobs | U corr | ~0.73 | **~0.97** |
+| noobs | V corr | ~0.85 | **~0.98** |
+| noobs | U abs RMSE | ~1.49 | **~0.50** |
+| noobs | V abs RMSE | ~1.75 | **~1.27** |
+| noobs | U floored rel (0.5) | — | **~0.44** |
+| noobs | V floored rel (0.5) | — | **~1.28** |
+| noobs | raw U/V rel RMSE | ~8.5 / ~41 | ~4.2 / ~20 (still inflated by \|ref\|≈0) |
+| obs | U/V corr | ~0.38 / ~0.43 | **~0.49 / ~0.63** |
+| obs_model | U/V corr | ~0.73 / ~0.85 | **~0.97 / ~0.98** |
 
-Gates: `tests/thresholds.py` (`THRESH`, `WRF_DEMO_THRESH`).
+Root cause of prior degradation: runner applied divergence minimization despite
+`IOBR=0` / `IKINE=0`, with an incorrect slope `cdk`. Fix: gate on INP flags;
+Fortran-aligned slope + NSMTH + FRADJ.
+
+### Measured — daytime_zi (noobs, hours 00–17)
+
+| Field | Result |
+|-------|--------|
+| QSW day rel RMSE | ~0.012 |
+| ZI night rel RMSE | ~0.062 |
+| ZI day correlation | **~0.995** |
+| Day EL / WSTAR | unstable / >0 (Carson path active) |
+
+Absolute daytime ZI growth is faster than Fortran (constant `DPTMIN` gamma vs
+sounding lapse) — documented v2 item; shape/correlation gated.
+
+## v1 complete / v2 deferred
+
+See README. In short: core diagnostic + writers + goldens done; COARE, full
+clouds, IOUTMM5 variants, MIXDT sounding lapse, multi-station OA → **v2**.
 
 ## wrfout citation
 
-- https://github.com/NCAR/wrf_tutorial_data — `wrfout_d01_2005-08-28_00_00_00` (~63 MB)
+- https://github.com/NCAR/wrf_tutorial_data — `wrfout_d01_2005-08-28_00_00_00`
 - Documented in `cases/wrf_demo/README.md`
-- SURF/UP synthesized from wrfout near-surface/column (not real stations)
-
-## Remaining true blockers / later work
-
-1. Full DIAGNO OA / kinematic adjustment still approximate on coarse complex terrain (`wrf_demo` correlations good; relative RMSE large where |ref| is small).
-2. Daytime convective path unit-tested; wrf_demo golden window is night/early-morning UTC over Mexico — limited daytime radiative forcing in that archive.
-3. IOUTMM5 variants beyond 92, overwater COARE, cloud schemes — out of v1.
-4. Raw wrfout not in git (size); rebuild instructions in case README.

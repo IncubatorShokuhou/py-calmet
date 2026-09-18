@@ -82,7 +82,9 @@ def mixht_night(
 ) -> np.ndarray:
     """Stable mechanical mixing height (Venkatram + Zilitinkevich)."""
     zi1 = constn * ustar ** 1.5
-    zi2 = 0.4 * np.sqrt(ustar * el / fcori)
+    # Zilitinkevich only for stable (el > 0); else mechanical-only
+    el_pos = np.maximum(el, 0.0)
+    zi2 = np.where(el_pos > 0.0, 0.4 * np.sqrt(ustar * el_pos / fcori), zi1)
     zi = np.minimum(np.minimum(zi1, zi2), zimax)
     zi = np.maximum(zi, zimin)
     return zi
@@ -96,34 +98,52 @@ def mixht_day_carson(
     fcori: float | np.ndarray,
     dt_sec: float = 3600.0,
     ziconv_prev: np.ndarray | None = None,
-    dtheta: float = 0.01,
+    dtheta: float = 0.001,
     threshl: float = 0.05,
     constb: float = 1.41,
+    conste: float = 0.15,
     zimin: float = 50.0,
     zimax: float = 3000.0,
+    dptt_prev: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Daytime mixing height: Carson convective + mechanical (Venkatram 1980b).
+    """Daytime mixing height: Maul–Carson convective (MIXHMC) + mechanical.
 
-    Returns (zi, ziconv). Energy-balance Carson growth:
-        d(zi)/dt ≈ (2 * wt) / dtheta   with wt = qh/(rho*cp)
-    gated by THRESHL on buoyancy flux per meter.
+    Returns (zi, ziconv). Matches CALMET MIXHMC energy balance with
+    THRESHL (W/m^2 per m of BL) and CONSTE entrainment.
     """
-    wt = qh / (np.maximum(rho, 0.5) * CP)
-    # buoyancy flux proxy
-    buoy = G / np.maximum(tempk, 200.0) * wt
-    htold = np.zeros_like(qh) if ziconv_prev is None else ziconv_prev.copy()
-    # Carson: zi_new^2 ≈ zi_old^2 + 2*wt*dt / dtheta  (potential-temp jump)
-    dth = max(dtheta, 1e-3)
-    grow = np.where(buoy > threshl, 2.0 * wt * dt_sec / dth, 0.0)
-    ziconv = np.sqrt(np.maximum(htold ** 2 + grow, 0.0))
-    ziconv = np.minimum(ziconv, zimax)
+    qh = np.asarray(qh, dtype=np.float64)
+    rho = np.maximum(np.asarray(rho, dtype=np.float64), 0.5)
+    wt = qh / (rho * CP)  # <w'Theta'> K m/s
+    htold = np.zeros_like(qh) if ziconv_prev is None else np.asarray(ziconv_prev, dtype=np.float64).copy()
+    dptt = np.zeros_like(qh) if dptt_prev is None else np.asarray(dptt_prev, dtype=np.float64).copy()
 
-    # Mechanical daytime (neutral): hmech = cmech * ustar / N^0.5 approx
-    # Use BVF proxy from dtheta/dz ~ dth/200m
-    tave = tempk
-    bvf = (G * dth / np.maximum(tave * 200.0, 1.0)) ** 0.25
+    gamma = max(float(dtheta), 1e-4)  # pot-temp lapse above zi (K/m)
+    onedte = dt_sec * (1.0 + conste)
+    twodte = 2.0 * dt_sec * conste
+
+    # Threshold buoyancy flux (K m/s): wto = thresh * h / (rho*cp)
+    # thresh is W/m^2/m → divide by rho*cp gives K/s / m * h = K m/s
+    wto = threshl * htold / (rho * CP)
+
+    ziconv = np.zeros_like(qh)
+    net = wt - wto
+    grow = net > 0.0
+    # Weakly convective: relax toward equilibrium zi = rho*cp*wt/thresh
+    weak = (wt > 0.0) & ~grow
+    if np.any(weak) and threshl > 0:
+        ziceq = rho * CP * wt / max(threshl, 1e-6)
+        ziconv = np.where(weak, ziceq + (htold - ziceq) * np.exp(-dt_sec / 800.0), ziconv)
+
+    if np.any(grow):
+        dpttp1 = np.sqrt(np.maximum(gamma * twodte * net, 0.0))
+        unsqrt = htold ** 2 + 2.0 * (net * onedte - dptt * htold) / gamma
+        unsqrt = np.maximum(unsqrt, 0.0)
+        zic = np.sqrt(unsqrt) + dpttp1 / gamma
+        ziconv = np.where(grow, np.minimum(np.maximum(zic, 0.0), zimax), ziconv)
+
+    # Mechanical daytime (Venkatram): CMECH * ustar
     cmech = constb / np.sqrt(np.maximum(np.asarray(fcori, dtype=np.float64), 1e-5))
-    hmech = cmech * ustar / np.maximum(bvf, 1e-3)
+    hmech = np.minimum(cmech * ustar, zimax)
 
     zi = np.maximum(np.maximum(zimin, hmech), ziconv)
     zi = np.minimum(zi, zimax)
@@ -164,3 +184,109 @@ def relative_humidity_2d(q2_gkg: np.ndarray, tempk: np.ndarray, pres_mb: float |
     es_mb = a[0] + tc * (a[1] + tc * (a[2] + tc * (a[3] + tc * (a[4] + tc * (a[5] + tc * a[6])))))
     es = np.maximum(es_mb, 0.01) * 100.0
     return np.clip(100.0 * e / es, 1.0, 100.0).astype(np.float64)
+
+
+# Holtslag & van Ulden (1983) short-wave / energy-budget constants (CALMET defaults)
+HA1 = 990.0
+HA2 = -30.0
+HB1 = -0.75
+HB2 = 3.4
+HC1 = 5.31e-13
+HC2 = 60.0
+HC3 = 0.12
+
+
+def sine_solar_elevation(
+    lat_deg: float | np.ndarray,
+    lon_deg_east: float | np.ndarray,
+    jday: int,
+    hour_utc: float,
+    ibtz: int = 0,
+) -> np.ndarray:
+    """Sine of solar elevation (CALMET SOLAR, half-hour centered).
+
+    ``ibtz`` is the base time zone offset such that local = UTC - ibtz
+    (CALMET: 5=EST …). For ABTZ=UTC+0000 use ibtz=0.
+    lon is **east** longitude (CALMET ≥ 050328 convention).
+    """
+    lat = np.asarray(lat_deg, dtype=np.float64)
+    lon = np.asarray(lon_deg_east, dtype=np.float64)
+    d = (float(jday) - 1.0) * 0.9856479
+    radd = np.deg2rad(d)
+    xsind, xcosd = np.sin(radd), np.cos(radd)
+    rad2d = 2.0 * radd
+    sin2d, cos2d = np.sin(rad2d), np.cos(rad2d)
+    em = (
+        12.0
+        + 0.12357 * xsind
+        - 0.004289 * xcosd
+        + 0.153809 * sin2d
+        + 0.060783 * cos2d
+    )
+    sigma = (
+        279.9348
+        + d
+        + 1.914827 * xsind
+        - 0.079525 * xcosd
+        + 0.019938 * sin2d
+        - 0.00162 * cos2d
+    )
+    sincd = 0.39784989 * np.sin(np.deg2rad(sigma))
+    capd = np.arcsin(sincd)
+    coscd = np.cos(capd)
+    radlat = np.deg2rad(lat)
+    sinlat, coslat = np.sin(radlat), np.cos(radlat)
+    # half-hour after clock hour, in GMT = hour+0.5 + ibtz  (ihr-1 - 0.5 + ibtz with ihr=hour+1)
+    gmt = float(hour_utc) + 0.5 + float(ibtz)
+    solha = 15.0 * (gmt - em) + lon
+    return sinlat * sincd + coslat * coscd * np.cos(np.deg2rad(solha))
+
+
+def shortwave_radiation(
+    sinalp: np.ndarray,
+    ccfrac: float | np.ndarray = 0.0,
+) -> np.ndarray:
+    """QSW (W/m^2) from sine solar elevation and cloud fraction."""
+    cc = np.asarray(ccfrac, dtype=np.float64)
+    qsw = (HA1 * np.asarray(sinalp, dtype=np.float64) + HA2) * (1.0 + HB1 * cc ** HB2)
+    return np.maximum(qsw, 0.0)
+
+
+def heat_flux_energy_budget(
+    qsw: np.ndarray,
+    tempk: np.ndarray,
+    sinalp: np.ndarray,
+    ccfrac: float | np.ndarray = 0.0,
+    albedo: float | np.ndarray = 0.2,
+    bowen: float | np.ndarray = 1.0,
+    hcg: float | np.ndarray = 0.15,
+    qf: float | np.ndarray = 0.0,
+    landuse: np.ndarray | None = None,
+    iwat1: int = 55,
+    iwat2: int = 55,
+) -> np.ndarray:
+    """Daytime sensible heat flux (Holtslag–van Ulden); night → -0.1 over land."""
+    qsw = np.asarray(qsw, dtype=np.float64)
+    tempk = np.asarray(tempk, dtype=np.float64)
+    sinalp = np.asarray(sinalp, dtype=np.float64)
+    cc = np.asarray(ccfrac, dtype=np.float64)
+    alb = np.asarray(albedo, dtype=np.float64)
+    bo = np.asarray(bowen, dtype=np.float64)
+    hg = np.asarray(hcg, dtype=np.float64)
+    qa = np.asarray(qf, dtype=np.float64)
+    qh = np.full(tempk.shape, -0.1, dtype=np.float64)
+    day = sinalp > 0.0
+    if landuse is not None:
+        water = (landuse >= iwat1) & (landuse <= iwat2)
+        day = day & ~water
+        qh = np.where(water, 0.0, qh)
+    if np.any(day):
+        qstar = (
+            (1.0 - alb) * qsw
+            + HC1 * tempk ** 6
+            - 5.67e-8 * tempk ** 4
+            + HC2 * cc
+        ) / (HC3 + 1.0)
+        qh_day = bo * (qstar * (1.0 - hg) + qa) / (1.0 + bo)
+        qh = np.where(day, qh_day, qh)
+    return qh
