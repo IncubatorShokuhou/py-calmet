@@ -61,9 +61,10 @@ def test_mixht_day_grows_unit():
     rho = np.full((4, 4), 1.2)
     tempk = np.full((4, 4), 300.0)
     ustar = np.full((4, 4), 0.35)
-    zi0, zc0 = pbl.mixht_day_carson(qh, rho, tempk, ustar, 1e-4, dt_sec=3600.0, dtheta=0.001)
-    zi1, zc1 = pbl.mixht_day_carson(
-        qh, rho, tempk, ustar, 1e-4, dt_sec=3600.0, ziconv_prev=zc0, dtheta=0.001
+    zi0, zc0, dp0 = pbl.mixht_day_carson(qh, rho, tempk, ustar, 1e-4, dt_sec=3600.0, dtheta=0.001)
+    zi1, zc1, dp1 = pbl.mixht_day_carson(
+        qh, rho, tempk, ustar, 1e-4, dt_sec=3600.0, ziconv_prev=zc0, dptt_prev=dp0, dtheta=0.001
     )
     assert zc1.mean() > zc0.mean()
     assert zi1.mean() >= 50.0
+    assert dp1.mean() > 0.0

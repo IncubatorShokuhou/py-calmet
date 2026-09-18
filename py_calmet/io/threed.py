@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 import numpy as np
 
 
@@ -52,15 +52,21 @@ def read_3d(path: str | Path) -> ThreeDData:
     ymdh = hdr[:10]
     rest = hdr[10:].split()
     nhrs = int(rest[0])
-    i += 1  # extraction subdomain
+    ext = lines[i]
+    i += 1
+    i0 = int(ext[0:4])
+    j0 = int(ext[4:8])
     sigma = np.array([float(lines[i + k].split()[0]) for k in range(nk)], dtype=np.float64)
     i += nk
     elev = np.zeros((nj, ni), dtype=np.float64)
-    for jj in range(nj):
-        for ii_ in range(ni):
-            parts = lines[i].split(); i += 1
-            # i j lat lon elev lu ...
-            elev[jj, ii_] = float(parts[4])
+    for _jj in range(nj):
+        for _ii in range(ni):
+            parts = lines[i].split()
+            i += 1
+            # i j lat lon elev lu ...  (i,j are 1-based extraction indices)
+            ii = int(np.clip(int(parts[0]) - i0, 0, ni - 1))
+            jj = int(np.clip(int(parts[1]) - j0, 0, nj - 1))
+            elev[jj, ii] = float(parts[4])
 
     wd10 = np.zeros((nhrs, nj, ni)); ws10 = np.zeros_like(wd10); t2 = np.zeros_like(wd10)
     pres = np.zeros((nhrs, nj, ni, nk)); height_msl = np.zeros_like(pres)
@@ -69,40 +75,42 @@ def read_3d(path: str | Path) -> ThreeDData:
     hours: List[str] = []
 
     for t in range(nhrs):
-        for jj in range(nj):
-            for ii_ in range(ni):
-                sline = lines[i]; i += 1
+        for _row in range(nj):
+            for _col in range(ni):
+                sline = lines[i]
+                i += 1
                 stamp = sline[:10]
-                if jj == 0 and ii_ == 0:
+                if _row == 0 and _col == 0:
                     hours.append(stamp)
-                # stamp(10) i(3) j(3) spres(7.1) rain(5.2) sc(2) radsw(8.1) radlw(8.1) t2(8.1) q2(8.2) wd10(8.1) ws10(8.1) sst(8.1)
-                body = sline[10:]
-                # fixed-ish parse via split after removing stamp
-                # use known widths from format
-                ii_idx = int(sline[10:13]); jj_idx = int(sline[13:16])
-                # remaining floats
+                # stamp(10) i(3) j(3) ...
+                ii_idx = int(sline[10:13])
+                jj_idx = int(sline[13:16])
+                ii = int(np.clip(ii_idx - i0, 0, ni - 1))
+                jj = int(np.clip(jj_idx - j0, 0, nj - 1))
                 rest = sline[16:]
-                # spres rain sc radsw radlw t2 q2 wd10 ws10 sst
-                # sc is int in middle — split carefully
-                vals = rest.replace('  ', ' ').split()
+                vals = rest.replace("  ", " ").split()
                 # vals: spres rain sc radsw radlw t2 q2 wd10 ws10 sst
-                t2[t, jj, ii_] = float(vals[5])
-                wd10[t, jj, ii_] = float(vals[7])
-                ws10[t, jj, ii_] = float(vals[8])
+                t2[t, jj, ii] = float(vals[5])
+                wd10[t, jj, ii] = float(vals[7])
+                ws10[t, jj, ii] = float(vals[8])
                 for k in range(nk):
-                    uline = lines[i]; i += 1
+                    uline = lines[i]
+                    i += 1
                     # pmb(4) z(6) temp(6.1) wd(4) ws(5.1) w(6.2) rh(3) vapmr(5.2)
-                    pmb = int(uline[0:4]); z = int(uline[4:10])
-                    temp = float(uline[10:16]); wdi = int(uline[16:20])
-                    wsi = float(uline[20:25]); wi = float(uline[25:31])
+                    pmb = int(uline[0:4])
+                    z = int(uline[4:10])
+                    temp = float(uline[10:16])
+                    wdi = int(uline[16:20])
+                    wsi = float(uline[20:25])
+                    wi = float(uline[25:31])
                     rhi = int(uline[31:34])
-                    pres[t, jj, ii_, k] = pmb
-                    height_msl[t, jj, ii_, k] = z
-                    tempk[t, jj, ii_, k] = temp
-                    wd[t, jj, ii_, k] = wdi
-                    ws[t, jj, ii_, k] = wsi
-                    w[t, jj, ii_, k] = wi
-                    rh[t, jj, ii_, k] = rhi
+                    pres[t, jj, ii, k] = pmb
+                    height_msl[t, jj, ii, k] = z
+                    tempk[t, jj, ii, k] = temp
+                    wd[t, jj, ii, k] = wdi
+                    ws[t, jj, ii, k] = wsi
+                    w[t, jj, ii, k] = wi
+                    rh[t, jj, ii, k] = rhi
 
     return ThreeDData(
         ni=ni, nj=nj, nk=nk, x0_km=x0, y0_km=y0, dx_km=dx, sigma=sigma, elev=elev,

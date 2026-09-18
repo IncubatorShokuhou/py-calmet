@@ -7,7 +7,7 @@ import struct
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import BinaryIO, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -107,14 +107,15 @@ class CalmetDataset:
         """Return x coordinates for cell centers."""
         if self.run_control is None:
             raise ValueError("Dataset is not initialized")
-        return self.run_control.xorigr + np.arange(self.nx, dtype=np.float32) * self.run_control.dgrid
+        # XORIGR is the SW corner of cell (1,1); cell centers are +0.5 cell.
+        return self.run_control.xorigr + (np.arange(self.nx, dtype=np.float32) + 0.5) * self.run_control.dgrid
 
     @property
     def y(self) -> np.ndarray:
         """Return y coordinates for cell centers."""
         if self.run_control is None:
             raise ValueError("Dataset is not initialized")
-        return self.run_control.yorigr + np.arange(self.ny, dtype=np.float32) * self.run_control.dgrid
+        return self.run_control.yorigr + (np.arange(self.ny, dtype=np.float32) + 0.5) * self.run_control.dgrid
 
     @classmethod
     def read(cls, path: str | Path) -> "CalmetDataset":
@@ -484,10 +485,18 @@ def _parse_run_control(payload: bytes, endian: str) -> RunControl:
     )
 
 def _parse_yyyyjjjhh(date_code: int, seconds: int) -> datetime:
+    """Decode CALMET NDATHR = YYYY*100000 + JJJ*100 + HH.
+
+    The remainder after the 4-digit year is *five* digits (JJJHH), not six.
+    Using ``% 1_000_000`` mis-parses years whose last digit is not 0
+    (e.g. 2005-08-28 → Julian 5240 / 2019-05-07).
+    """
     year = date_code // 100_000
-    jday_hour = date_code % 1_000_000
+    jday_hour = date_code % 100_000
     jday = jday_hour // 100
     hour = jday_hour % 100
+    if jday < 1 or jday > 366 or hour > 24:
+        raise ValueError(f"Invalid YYYYJJJHH date code: {date_code}")
     base = datetime(year, 1, 1) + timedelta(days=jday - 1, hours=hour)
     return base + timedelta(seconds=seconds)
 
@@ -639,6 +648,8 @@ def write_calmet_dat(
     nears: np.ndarray | None = None,
     comments: List[str] | None = None,
     rmm: np.ndarray | None = None,
+    xpsta: np.ndarray | None = None,
+    ypsta: np.ndarray | None = None,
 ) -> None:
     """Write a CALMET.DAT file readable by :class:`CalmetDataset`.
 
@@ -683,6 +694,11 @@ def write_calmet_dat(
             yu = np.asarray(yusta if yusta is not None else [0.0], dtype=np.float32)
             w.write_record(_pack_labeled("XUSTA", np.asarray(xu, dtype=f"{endian}f4").tobytes()))
             w.write_record(_pack_labeled("YUSTA", np.asarray(yu, dtype=f"{endian}f4").tobytes()))
+        if run_control.npsta >= 1:
+            xp = np.asarray(xpsta if xpsta is not None else [0.0], dtype=np.float32)
+            yp = np.asarray(ypsta if ypsta is not None else [0.0], dtype=np.float32)
+            w.write_record(_pack_labeled("XPSTA", np.asarray(xp, dtype=f"{endian}f4").tobytes()))
+            w.write_record(_pack_labeled("YPSTA", np.asarray(yp, dtype=f"{endian}f4").tobytes()))
 
         for label, arr, kind in (
             ("Z0", z0, "real"),

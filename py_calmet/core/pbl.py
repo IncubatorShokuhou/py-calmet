@@ -105,11 +105,12 @@ def mixht_day_carson(
     zimin: float = 50.0,
     zimax: float = 3000.0,
     dptt_prev: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Daytime mixing height: Maul–Carson convective (MIXHMC) + mechanical.
 
-    Returns (zi, ziconv). Matches CALMET MIXHMC energy balance with
-    THRESHL (W/m^2 per m of BL) and CONSTE entrainment.
+    Returns (zi, ziconv, dptt) so the inversion jump ``dptt`` can be carried
+    into the next hour (CALMET MIXHMC). Callers that only need heights can
+    ignore the third array.
     """
     qh = np.asarray(qh, dtype=np.float64)
     rho = np.maximum(np.asarray(rho, dtype=np.float64), 0.5)
@@ -140,6 +141,7 @@ def mixht_day_carson(
         unsqrt = np.maximum(unsqrt, 0.0)
         zic = np.sqrt(unsqrt) + dpttp1 / gamma
         ziconv = np.where(grow, np.minimum(np.maximum(zic, 0.0), zimax), ziconv)
+        dptt = np.where(grow, dpttp1, dptt)
 
     # Mechanical daytime (Venkatram): CMECH * ustar
     cmech = constb / np.sqrt(np.maximum(np.asarray(fcori, dtype=np.float64), 1e-5))
@@ -147,7 +149,7 @@ def mixht_day_carson(
 
     zi = np.maximum(np.maximum(zimin, hmech), ziconv)
     zi = np.minimum(zi, zimax)
-    return zi, ziconv
+    return zi, ziconv, dptt
 
 
 def ipgt_from_el(el: np.ndarray, zimin: float = 50.0) -> np.ndarray:

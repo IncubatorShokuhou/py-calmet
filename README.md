@@ -17,7 +17,7 @@ suites (`small_domain`, `wrf_demo`) plus a daytime convective ZI golden.
 ### v1 complete
 
 - Readers + writers: GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT / NetCDF
-- Winds: 3D→CALMET interp, SIMILT profiles, Barnes OA (R1/R2), **FRADJ**, **slope flow** (Mahrt/cdk=0.08), **NSMTH** smooth; **IOBR/IKINE-gated** divergence minimization
+- Winds: 3D→CALMET geographic interp, power-law obs profiles (`similt_profile` helper exists, not wired), Barnes OA (R1/R2), **FRADJ**, **slope flow** (Mahrt/cdk=0.08), **NSMTH** smooth; **IOBR/IKINE-gated** divergence minimization
 - PBL: night ELUSTR+MIXHT; **daytime energy-budget QH + Maul–Carson ZI**; solar/QSW
 - Golden parity: tiny-domain tight; wrf_demo U/V corr ≳ 0.97 (noobs); daytime ZI corr ≳ 0.99 vs Fortran shape
 
