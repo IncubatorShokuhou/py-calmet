@@ -48,7 +48,7 @@ Sample INP files scanned: **14**. Machine-readable twin: [`calmet-inp-params.jso
 | `SRFDAT` | character | Y | **Implemented** | `files.srfdat` | Honored via _resolve_data_file. |
 | `PRCDAT` | character |  | **Implemented** | `files.prcdat` | PRECIP.DAT reader; NPSTA>0 station rates → Barnes RMM. |
 | `MM4DAT` | character |  | **Implemented** | `files.mm4dat` | OutOfScope: non-default MM4/MM5 filenames raise NotImplementedError; use wrfout→3D.DAT. |
-| `WTDAT` | character |  | **Implemented** | `files.wtdat` | Ignored with qa_note; water T via SEA.DAT / ITWPROG (legacy WT.DAT unused). |
+| `WTDAT` | character |  | **Implemented** | `files.wtdat` | Overwater SST soft-spot (`io.wt_dat`); precedence ITWPROG>SEA>WT>air-T. Official terrain-weight WT.DAT OutOfScope. |
 | `METLST` | character | Y | **Implemented** | `files.metlst` | METLST list-file writer (run summary); runner writes when write_outputs=True. |
 | `METDAT` | character | Y | **Implemented** | `files.metdat` | METDAT name exposed on result.meta; LSAVE honored as flag. |
 | `PACDAT` | character |  | **Implemented** | `files.pacdat` | PACOUT.DAT npz writer when IFORMO=2 and write_outputs=True. |

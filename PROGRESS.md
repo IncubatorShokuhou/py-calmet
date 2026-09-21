@@ -1,5 +1,13 @@
 # py-calmet progress
 
+## Align-light (马尾) — missing-obs sentinels
+
+- **UP.DAT** missing `ws`/`wd` (≥998) filtered in `obs_profile_similt` (same gate as VERTAV/domain-avg); empty UA falls back to surface power-law — no more phantom ~100 m/s layers.
+- **SURF.DAT** `9999` → calm in `obs_surface_uv` (not a 9999 m/s wind).
+- Coverage note for **WTDAT** corrected (SST soft-spot, not “ignored”).
+- Skipped: COARE/DIAGNO rewrites, bit-identical floats, SURF temp/RH missing (winds-only), GEO N→S row order, slope `rho` (Fortran RHOCP=1229.9 constant).
+
+
 ## WP6 (this batch) — IDIOPT soft spots + WTDAT + Fortran align
 
 - **IDIOPT1/4/5=1**: real DIAG.DAT ingestion (`io.diag_dat` ASCII subset); wired in
