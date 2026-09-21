@@ -69,4 +69,24 @@ def obs_surface_uv(ws: float, wd: float, nx: int, ny: int) -> tuple[np.ndarray, 
     return np.full((ny, nx), u, dtype=np.float64), np.full((ny, nx), v, dtype=np.float64)
 
 
-def obs_profile_sim
+def obs_profile_similt(
+    u_sfc: float,
+    v_sfc: float,
+    z_anem: float,
+    z0: float,
+    el: float,
+    zi: float,
+    zface: np.ndarray,
+    sounding_levels,
+    stn_elev: float,
+    zimin: float,
+    nx: int,
+    ny: int,
+    p_exp: float = 0.17,
+    iextrp: int = -4,
+    fextr2: list[float] | np.ndarray | None = None,
+    bias: list[float] | np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Obs vertical profile controlled by IEXTRP.
+
+    * ``IEXTRP =
