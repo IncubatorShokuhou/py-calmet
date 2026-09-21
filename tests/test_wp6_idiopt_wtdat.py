@@ -172,33 +172,17 @@ def test_water_t_sea_beats_wt():
     assert float(t_sea.mean()) == pytest.approx(280.0)
 
 
-def _module_source(mod, frag_dir_name: str) -> str:
-    core = Path(mod.__file__).resolve().parent
-    frags = sorted((core / frag_dir_name).glob("part_*.pyfrag")) if (core / frag_dir_name).is_dir() else []
-    if frags:
-        return "".join(p.read_text() for p in frags)
-    return Path(mod.__file__).read_text()
-
-
 def test_part_b_g_constant_in_froude():
     # Froude / TOPOF2 / slope use shared met_utils.G (9.81)
     assert G == pytest.approx(9.81)
-    src = _module_source(winds, "_winds_frags")
+    src = Path(winds.__file__).read_text()
     assert "sqrt(G *" in src
     assert "(G / temp)" in src
 
 
-def _runner_source() -> str:
-    """Read runner body (monolithic or MCP frag-assembled)."""
-    core = Path(__file__).resolve().parents[1] / "py_calmet" / "core"
-    frags = sorted((core / "_runner_frags").glob("part_*.pyfrag")) if (core / "_runner_frags").is_dir() else []
-    if frags:
-        return "".join(p.read_text() for p in frags)
-    return (core / "runner.py").read_text()
-
-
 def test_part_b_irtype0_zeros_like_pattern():
     # Documented contract: collapse uses zeros_like(zi), not zeros_like(wstar)
-    text = _runner_source()
+    from py_calmet.core import runner
+    text = Path(runner.__file__).read_text()
     assert "wstar = np.zeros_like(zi)" in text
     assert "wstar = np.zeros_like(wstar)" not in text
