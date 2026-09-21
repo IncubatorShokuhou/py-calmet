@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 
 from ..io.geo import read_geo
-from ..io.surf import read_surf
+from ..io.surf import read_surf, surf_tempk, surf_rh, surf_pres, surf_sky
 from ..io.up import read_up
 from ..io.threed import read_3d
 from ..io.inp import read_inp
@@ -521,10 +521,10 @@ def run_calmet(
             rec = surf.records[min(h, len(surf.records) - 1)]
             u1, v1 = winds.obs_surface_uv(rec.ws, rec.wd, nx, ny)
             sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
-            temp2d = np.full((ny, nx), rec.tempk)
-            rho_tmp = pbl.air_density(temp2d, rec.pres)
+            temp2d = np.full((ny, nx), surf_tempk(rec))
+            rho_tmp = pbl.air_density(temp2d, surf_pres(rec))
             ust_tmp, el_tmp, _ = pbl.elustr_stable(
-                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky
+                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, surf_sky(rec)
             )
             zi_tmp = pbl.mixht_night(ust_tmp, el_tmp, fcori, constn, zimin, zimax)
             U, V = winds.obs_profile_similt(
@@ -544,10 +544,10 @@ def run_calmet(
                 fextr2=fextr2,
                 bias=bias,
             )
-            sky = rec.sky
-            irh = np.full((ny, nx), rec.rh, dtype=np.int32)
+            sky = surf_sky(rec)
+            irh = np.full((ny, nx), surf_rh(rec), dtype=np.int32)
             ccfrac = clouds.resolve_cloud_fraction(
-                mcloud=mcloud, icloud=icloud, sky_tenths=rec.sky, shape=(ny, nx)
+                mcloud=mcloud, icloud=icloud, sky_tenths=sky, shape=(ny, nx)
             )
         else:  # obs_model
             assert surf is not None and up is not None and threed is not None
@@ -558,10 +558,10 @@ def run_calmet(
             rec = surf.records[min(h, len(surf.records) - 1)]
             u1, v1 = winds.obs_surface_uv(rec.ws, rec.wd, nx, ny)
             sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
-            temp2d = np.full((ny, nx), rec.tempk)
-            rho_tmp = pbl.air_density(temp2d, rec.pres)
+            temp2d = np.full((ny, nx), surf_tempk(rec))
+            rho_tmp = pbl.air_density(temp2d, surf_pres(rec))
             ust_tmp, el_tmp, _ = pbl.elustr_stable(
-                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky
+                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, surf_sky(rec)
             )
             zi_tmp = pbl.mixht_night(ust_tmp, el_tmp, fcori, constn, zimin, zimax)
             Uo, Vo = winds.obs_profile_similt(
@@ -612,8 +612,8 @@ def run_calmet(
                 nintr2=nintr2 or None,
                 barriers=barrier_set,
             )
-            sky = rec.sky
-            irh = np.full((ny, nx), rec.rh, dtype=np.int32)
+            sky = surf_sky(rec)
+            irh = np.full((ny, nx), surf_rh(rec), dtype=np.int32)
             method = mcloud if mcloud not in (0, 999) else icloud
             if method in (3, 4) and threed is not None:
                 cc_prog = clouds.resolve_cloud_fraction(
@@ -629,7 +629,7 @@ def run_calmet(
                         ccfrac[j, i] = float(cc_prog[jj, ii])
             else:
                 ccfrac = clouds.resolve_cloud_fraction(
-                    mcloud=mcloud, icloud=icloud, sky_tenths=rec.sky, shape=(ny, nx),
+                    mcloud=mcloud, icloud=icloud, sky_tenths=sky, shape=(ny, nx),
                 )
 
         # IRHPROG: RH from prognostic 3D when flag set
@@ -666,8 +666,8 @@ def run_calmet(
             pres_mb = 1012.0
         else:
             rec_h = surf.records[min(h, len(surf.records) - 1)]
-            rho = pbl.air_density(temp2d, rec_h.pres)
-            pres_mb = rec_h.pres
+            rho = pbl.air_density(temp2d, surf_pres(rec_h))
+            pres_mb = surf_pres(rec_h)
 
         # IAVET / TRADKM / NUMTS temperature smoother (no-op when NUMTS<=1)
         temp2d = run_options.average_temperature(

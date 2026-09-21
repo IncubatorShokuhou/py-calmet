@@ -1,11 +1,17 @@
 # py-calmet progress
 
+## Align-surf-missing-t-rh (马尾) — SURF T/RH/P/sky sentinels
+
+- **SURF.DAT** missing `tempk` / `rh` / `pres` / `sky` (≥9000 or non-finite) → meteorological defaults via `surf_tempk` / `surf_rh` / `surf_pres` / `surf_sky` (288.15 K, 70%, 1012 mb, sky=0), wired in runner — no more phantom ~10k K poisoning PBL/flux / ELUSTR.
+- Winds 9999→calm already on main (PR #4). Slope `RHOCP=1229.9` already present; skipped re-touch.
+- Skipped: GEO N→S row order, COARE/DIAGNO rewrites, bit-identical floats, MM4/MM5.
+
 ## Align-light (马尾) — missing-obs sentinels
 
 - **UP.DAT** missing `ws`/`wd` (≥998) filtered in `obs_profile_similt` (same gate as VERTAV/domain-avg); empty UA falls back to surface power-law — no more phantom ~100 m/s layers.
 - **SURF.DAT** `9999` → calm in `obs_surface_uv` (not a 9999 m/s wind).
 - Coverage note for **WTDAT** corrected (SST soft-spot, not “ignored”).
-- Skipped: COARE/DIAGNO rewrites, bit-identical floats, SURF temp/RH missing (winds-only), GEO N→S row order, slope `rho` (Fortran RHOCP=1229.9 constant).
+- Follow-up: SURF temp/RH/pres/sky missing (this batch).
 
 
 ## WP6 (this batch) — IDIOPT soft spots + WTDAT + Fortran align
