@@ -36,6 +36,7 @@ def test_idiopt1_applies_diag_tsfc():
     t = np.full((3, 3), 280.0)
     out = diag_opts.apply_diag_sfc_temp(t, idiopt1=1, tsfc=295.0)
     assert float(out.mean()) == pytest.approx(295.0)
+    # idiopt1=0 → unchanged
     out0 = diag_opts.apply_diag_sfc_temp(t, idiopt1=0, tsfc=295.0)
     assert float(out0.mean()) == pytest.approx(280.0)
 
@@ -43,6 +44,7 @@ def test_idiopt1_applies_diag_tsfc():
 def test_idiopt4_5_gated_by_irtype():
     u = np.ones((4, 4))
     v = np.zeros((4, 4))
+    # IRTYPE≠0 → ignore even if IDIOPT4=1
     u2, v2 = diag_opts.apply_diag_sfc_uv(
         u, v, idiopt4=1, irtype=1, usfc=7.0, vsfc=2.0
     )
@@ -60,7 +62,7 @@ def test_idiopt4_5_gated_by_irtype():
         U, V, idiopt5=1, irtype=0, uup=9.0, vup=-3.0
     )
     assert float(U2[1].mean()) == pytest.approx(9.0)
-    assert float(U2[0].mean()) == pytest.approx(1.0)
+    assert float(U2[0].mean()) == pytest.approx(1.0)  # surface untouched
 
 
 def test_idiopt2_uses_diag_gamma():
@@ -75,6 +77,7 @@ def test_idiopt2_uses_diag_gamma():
     )
     assert "DIAG.DAT" in note
     assert g == pytest.approx(0.008)
+    # missing DIAG → proxy
     g2, note2 = diag_opts.resolve_diag_gamma(
         idiopt2=1,
         zupt=200.0,
@@ -106,7 +109,7 @@ def test_read_wt_and_sst_grid(tmp_path: Path):
     fb = np.full((2, 2), 290.0)
     sst = wt_sst_grid(r, 2, 2, lu, 55, 55, fb)
     assert sst[0, 1] == pytest.approx(285.0)
-    assert sst[0, 0] == pytest.approx(290.0)
+    assert sst[0, 0] == pytest.approx(290.0)  # land unchanged
 
 
 def test_water_t_precedence_wt_over_air():
@@ -169,15 +172,33 @@ def test_water_t_sea_beats_wt():
     assert float(t_sea.mean()) == pytest.approx(280.0)
 
 
+def _module_source(mod, frag_dir_name: str) -> str:
+    core = Path(mod.__file__).resolve().parent
+    frags = sorted((core / frag_dir_name).glob("part_*.pyfrag")) if (core / frag_dir_name).is_dir() else []
+    if frags:
+        return "".join(p.read_text() for p in frags)
+    return Path(mod.__file__).read_text()
+
+
 def test_part_b_g_constant_in_froude():
+    # Froude / TOPOF2 / slope use shared met_utils.G (9.81)
     assert G == pytest.approx(9.81)
-    src = Path(winds.__file__).read_text()
+    src = _module_source(winds, "_winds_frags")
     assert "sqrt(G *" in src
     assert "(G / temp)" in src
 
 
+def _runner_source() -> str:
+    """Read runner body (monolithic or MCP frag-assembled)."""
+    core = Path(__file__).resolve().parents[1] / "py_calmet" / "core"
+    frags = sorted((core / "_runner_frags").glob("part_*.pyfrag")) if (core / "_runner_frags").is_dir() else []
+    if frags:
+        return "".join(p.read_text() for p in frags)
+    return (core / "runner.py").read_text()
+
+
 def test_part_b_irtype0_zeros_like_pattern():
-    runner = Path(__file__).resolve().parents[1] / "py_calmet" / "core" / "runner.py"
-    text = runner.read_text()
+    # Documented contract: collapse uses zeros_like(zi), not zeros_like(wstar)
+    text = _runner_source()
     assert "wstar = np.zeros_like(zi)" in text
     assert "wstar = np.zeros_like(wstar)" not in text
