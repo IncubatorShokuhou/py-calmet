@@ -1,5 +1,14 @@
 # py-calmet progress
 
+## Align-up-temp-precip-sea-miss (马尾) — UP T / PRECIP / SEA 缺测
+
+- **UP.DAT** `temp_c≥998` → `up_tempk` 返回 NaN；runner 探空 T 走该路径；**Holzworth** 跳过非物理 Kelvin，避免 999°C→1272 K 把 Zi 拽崩。
+- **NFLAGP**：≥9000 / 非有限降水率清零（与 PRECIP.DAT 9999 同族），别让 Barnes OA 吃到幻影 mm/h。
+- **SEA.DAT**：`t_air` 缺测 → `t_sea=NaN`，`sea_sst_grid` 跳过坏站保留空气温回退；仅 ΔT 缺测仍用 `t_air`。
+- 调查 wrf_demo obs `U_corr≈0.48`：L0 对齐，高层差来自 IEXTRP=-4 幂律相对 Fortran 更强切变；非一行哨兵 bug，**不改 DIAGNO**。
+- Skipped: GEO N→S、COARE/DIAGNO 大改、bit-identical、MM4/MM5。
+
+
 ## Align-surf-missing-t-rh (马尾) — SURF T/RH/P/sky sentinels
 
 - **SURF.DAT** missing `tempk` / `rh` / `pres` / `sky` (≥9000 or non-finite) → meteorological defaults via `surf_tempk` / `surf_rh` / `surf_pres` / `surf_sky` (288.15 K, 70%, 1012 mb, sky=0), wired in runner — no more phantom ~10k K poisoning PBL/flux / ELUSTR.

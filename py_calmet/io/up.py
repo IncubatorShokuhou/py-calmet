@@ -5,6 +5,29 @@ from pathlib import Path
 from typing import List
 import numpy as np
 
+# CALMET UP.DAT missing ≈ 999 (same family as VERTAV / obs_profile wind gate).
+MISS = 999.0
+
+
+def is_up_missing(v: float | int) -> bool:
+    """True for non-finite or Fortran-style ≥998 missing codes (T/ws/wd)."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return True
+    return (not np.isfinite(x)) or abs(x) >= 998.0
+
+
+def up_tempk(lev: "UpLevel") -> float:
+    """UP level temperature → Kelvin; missing → NaN (MIXDT/Holzworth filter).
+
+    Raw ``temp_c == 999`` must not become 1272 K and silently poison
+    Holzworth Zi or lapse rates that forget a miss gate.
+    """
+    if is_up_missing(lev.temp_c):
+        return float("nan")
+    return float(lev.temp_c) + 273.15
+
 
 @dataclass
 class UpLevel:

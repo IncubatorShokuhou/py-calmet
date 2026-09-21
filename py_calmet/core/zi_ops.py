@@ -98,12 +98,20 @@ def mixht_holzworth(
 
     Walks the sounding from the surface potential-temperature upward until
     the environmental pot-temp exceeds surface pot-temp.
+
+    Levels with non-finite or unphysical Kelvin temps (UP.DAT 999 → NaN via
+    ``up_tempk``, or raw ≥900 K) are skipped so missing T cannot yank Zi.
     """
     ts = np.asarray(tempk_sfc, dtype=np.float64)
     z = np.asarray(sounding_z, dtype=np.float64)
     t = np.asarray(sounding_t, dtype=np.float64)
+    # Keep meteorological Kelvin only (filters UP missing 999°C→1272 K etc.)
+    ok = np.isfinite(z) & np.isfinite(t) & (t > 150.0) & (t < 400.0)
+    z, t = z[ok], t[ok]
     if z.size < 2:
         return np.full(ts.shape, zimin, dtype=np.float64)
+    order = np.argsort(z)
+    z, t = z[order], t[order]
     # pot temp along sounding (approx, p~const lapse)
     th_s = t + 0.0098 * z
     th_sfc = float(np.nanmean(ts)) if ts.ndim else float(ts)

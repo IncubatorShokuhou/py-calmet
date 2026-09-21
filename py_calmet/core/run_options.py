@@ -136,11 +136,15 @@ def qa_isteppgs(inp, nsecdt: int) -> list[str]:
 
 
 def apply_nflagp(rates: np.ndarray, nflagp: int, cutp: float = 0.01) -> np.ndarray:
-    """Precip QC: NFLAGP=0 pass-through; 1 zero missing(<0); 2 also floor at CUTP."""
+    """Precip QC: NFLAGP=0 pass-through; 1 zero missing; 2 also floor at CUTP.
+
+    Missing includes negative rates and Fortran ≥9000 sentinels (PRECIP.DAT
+    9999). Without the ≥9000 gate a raw 9999 mm/h would survive into Barnes OA.
+    """
     r = np.asarray(rates, dtype=np.float64).copy()
     n = int(nflagp)
     if n >= 1:
-        r = np.where(r < 0.0, 0.0, r)
+        r = np.where((r < 0.0) | (r >= 9000.0) | ~np.isfinite(r), 0.0, r)
     if n >= 2:
         r = np.where(r < cutp, 0.0, r)
     return r
