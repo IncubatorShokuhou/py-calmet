@@ -54,4 +54,19 @@ def interp_3d_to_calmet(
             for L, zm in enumerate(zmid):
                 if zm < zs[0]:
                     ratio = (np.log(zm) - np.log(ZO_EXTRAP)) / (
-                        np.log(zs[0]) - np.log(ZO_EXTRA
+                        np.log(zs[0]) - np.log(ZO_EXTRAP)
+                    )
+                    U[L, j, i] = ratio * us[0]
+                    V[L, j, i] = ratio * vs[0]
+                else:
+                    U[L, j, i] = np.interp(zm, zs, us)
+                    V[L, j, i] = np.interp(zm, zs, vs)
+    return U, V
+
+
+def obs_surface_uv(ws: float, wd: float, nx: int, ny: int) -> tuple[np.ndarray, np.ndarray]:
+    u, v = wind_uv(wd, ws)
+    return np.full((ny, nx), u, dtype=np.float64), np.full((ny, nx), v, dtype=np.float64)
+
+
+def obs_profile_sim
