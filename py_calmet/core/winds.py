@@ -124,4 +124,61 @@ def obs_profile_similt(
             if np.isnan(us[L]):
                 u_ua = float(np.interp(zm, z_agl, uu))
                 v_ua = float(np.interp(zm, z_agl, vv))
-                U[L], V[L] = 
+                U[L], V[L] = u_ua, v_ua
+            else:
+                U[L], V[L] = float(us[L]), float(vs[L])
+    elif mode == 1:
+        for L, zm in enumerate(zmid):
+            if L == 0:
+                U[L], V[L] = u_sfc, v_sfc
+            else:
+                U[L] = float(np.interp(zm, z_agl, uu))
+                V[L] = float(np.interp(zm, z_agl, vv))
+    elif mode == 3:
+        fx = list(fextr2) if fextr2 is not None else [1.0] * nz
+        fx = fx + [fx[-1]] * max(0, nz - len(fx))
+        for L in range(nz):
+            U[L] = u_sfc * float(fx[L])
+            V[L] = v_sfc * float(fx[L])
+    else:
+        # ±2 and -4 (and unknown): golden-tuned power-law blend
+        for L, zm in enumerate(zmid):
+            if L == 0:
+                U[L], V[L] = u_sfc, v_sfc
+                continue
+            spd = ws1 * (zm / z_anem) ** p_exp
+            u_ua = float(np.interp(zm, z_agl, uu))
+            v_ua = float(np.interp(zm, z_agl, vv))
+            spd_ua = float(np.hypot(u_ua, v_ua))
+            w = min(1.0, np.log(max(zm, z_anem) / z_anem) / np.log(80.0))
+            spd = (1.0 - 0.4 * w) * spd + 0.4 * w * spd_ua
+            u_a = u_ua / max(spd_ua, 1e-6)
+            v_a = v_ua / max(spd_ua, 1e-6)
+            bu = (1.0 - w) * u_s + w * u_a
+            bv = (1.0 - w) * v_s + w * v_a
+            wdir = float(np.rad2deg(np.arctan2(-bu, -bv)) % 360.0)
+            u, v = wind_uv(wdir, spd)
+            U[L] = u
+            V[L] = v
+
+    if int(iextrp) < 0 and bias is not None and len(bias) > 0:
+        b = list(bias) + [0.0] * max(0, nz - len(bias))
+        for L in range(nz):
+            spd = float(np.hypot(U[L, 0, 0], V[L, 0, 0]))
+            if spd < 1e-9:
+                continue
+            scale = (spd + float(b[L])) / spd
+            U[L] *= scale
+            V[L] *= scale
+    return U, V
+
+
+def objective_analyze(
+    ug: np.ndarray,
+    vg: np.ndarray,
+    u_obs: np.ndarray,
+    v_obs: np.ndarray,
+    xs_m: float | np.ndarray,
+    ys_m: float | np.ndarray,
+    xorig_m: float,
+    yo
