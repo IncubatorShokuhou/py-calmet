@@ -238,15 +238,24 @@ def sea_sst_grid(
     hws = np.array([getattr(r, "hwave", -999.0) for r in sea_records], dtype=np.float64)
     tw_grid = np.full((ny, nx), -999.0)
     hw_grid = np.full((ny, nx), -999.0)
+    valid = np.isfinite(sst) & (sst < 9000.0) & (sst > 200.0)
     for j in range(ny):
         for i in range(nx):
             xc = xorig_km + (i + 0.5) * dgrid_km
             yc = yorig_km + (j + 0.5) * dgrid_km
             d2 = (xs - xc) ** 2 + (ys - yc) ** 2
-            k = int(np.argmin(d2))
-            t_sea[j, i] = sst[k]
-            tw_grid[j, i] = tws[k]
-            hw_grid[j, i] = hws[k]
+            # Prefer nearest station with a real SST; else keep air-T fallback
+            if np.any(valid):
+                d2_masked = np.where(valid, d2, np.inf)
+                k = int(np.argmin(d2_masked))
+                if np.isfinite(d2_masked[k]):
+                    t_sea[j, i] = sst[k]
+                    tw_grid[j, i] = tws[k]
+                    hw_grid[j, i] = hws[k]
+            else:
+                k = int(np.argmin(d2))
+                tw_grid[j, i] = tws[k]
+                hw_grid[j, i] = hws[k]
     tw_out = tw_grid if np.any(tws > 0) else None
     hw_out = hw_grid if np.any(hws > 0) else None
     return t_sea, tw_out, hw_out

@@ -8,7 +8,7 @@ import numpy as np
 
 from ..io.geo import read_geo
 from ..io.surf import read_surf, surf_tempk, surf_rh, surf_pres, surf_sky
-from ..io.up import read_up
+from ..io.up import read_up, up_tempk
 from ..io.threed import read_3d
 from ..io.inp import read_inp
 from ..io.sea import read_sea, pick_sea_record
@@ -715,7 +715,7 @@ def run_calmet(
                     [lev.height - stn_elev_d for lev in sounding_d.levels], dtype=np.float64
                 )
                 snd_t_diag = np.array(
-                    [lev.temp_c + 273.15 for lev in sounding_d.levels], dtype=np.float64
+                    [up_tempk(lev) for lev in sounding_d.levels], dtype=np.float64
                 )
             except Exception:
                 snd_z_diag = snd_t_diag = None
@@ -838,7 +838,7 @@ def run_calmet(
                     )
                     # UP.DAT stores temp as deg C → Kelvin for MIXDT
                     snd_t = np.array(
-                        [lev.temp_c + 273.15 for lev in sounding.levels],
+                        [up_tempk(lev) for lev in sounding.levels],
                         dtype=np.float64,
                     )
                 except Exception:

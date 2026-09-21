@@ -33,10 +33,20 @@ class SeaRecord:
 
     @property
     def t_sea(self) -> float:
-        """SST from air temp and air−sea ΔT (dtow = Tair − Tsea)."""
-        if self.dt_air_sea > 9000.0:
-            return self.t_air
-        return self.t_air - self.dt_air_sea
+        """SST from air temp and air−sea ΔT (dtow = Tair − Tsea).
+
+        Missing ``t_air`` (≥9000 / non-finite) → NaN so OA falls back rather
+        than poisoning overwater PBL with a phantom ~10k K SST. Missing ΔT
+        alone keeps ``t_air`` as SST (Fortran-ish soft fallback).
+        """
+        import math
+        ta = float(self.t_air)
+        if (not math.isfinite(ta)) or ta >= 9000.0:
+            return float("nan")
+        dt = float(self.dt_air_sea)
+        if (not math.isfinite(dt)) or dt >= 9000.0:
+            return ta
+        return ta - dt
 
     @property
     def begin_code(self) -> int:
