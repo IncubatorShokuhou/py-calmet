@@ -12,6 +12,8 @@ from .cloud_dat import read_cloud, write_cloud, CloudData
 from .metlst import write_metlst
 from .pacout import write_pacout, mixed_layer_uv
 from .wrfout import open_wrfout, wrfout_summary  # optional xarray
+from .diag_dat import read_diag, DiagData
+from .wt_dat import read_wt, WtData
 
 __all__ = [
     "CalmetDataset",
@@ -38,4 +40,8 @@ __all__ = [
     "open_wrfout",
     "wrfout_summary",
     "mixed_layer_uv",
+    "read_diag",
+    "DiagData",
+    "read_wt",
+    "WtData",
 ]
