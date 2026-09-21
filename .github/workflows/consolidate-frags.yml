@@ -1,0 +1,47 @@
+name: consolidate-frags
+on:
+  workflow_dispatch:
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chore-inline-runner-winds-frags
+          fetch-depth: 0
+      - name: Concatenate frags into monolithic modules
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import hashlib, shutil
+          def blob_sha(data: bytes) -> str:
+              return hashlib.sha1(b'blob %d\0' % len(data) + data).hexdigest()
+          def concat(frag_dir: Path, out: Path, expect: str) -> None:
+              parts = sorted(frag_dir.glob('part_*.pyfrag'))
+              if not parts:
+                  raise SystemExit(f'no frags in {frag_dir}')
+              data = b''.join(p.read_bytes() for p in parts)
+              got = blob_sha(data)
+              print(out, len(data), got)
+              if got != expect:
+                  raise SystemExit(f'SHA mismatch for {out}: {got} != {expect}')
+              out.write_bytes(data)
+          root = Path('py_calmet/core')
+          concat(root / '_winds_frags', root / 'winds.py', '39755114fbc623b7d43c208ce6ae7c7295e4ab09')
+          concat(root / '_runner_frags', root / 'runner.py', 'ba863513c01a2614f0e622b930c5595948067f67')
+          shutil.rmtree(root / '_winds_frags')
+          shutil.rmtree(root / '_runner_frags')
+          print('frags removed')
+          PY
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git status
+          git commit -m 'chore: inline winds/runner from frags (monolithic modules)'
+          git push origin HEAD:chore-inline-runner-winds-frags
