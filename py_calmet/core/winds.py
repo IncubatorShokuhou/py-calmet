@@ -89,4 +89,39 @@ def obs_profile_similt(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Obs vertical profile controlled by IEXTRP.
 
-    * ``IEXTRP =
+    * ``IEXTRP = ±1``: surface wind in layer 0 only; aloft from UA sounding.
+    * ``IEXTRP = ±2`` or ``-4`` (golden-safe): power-law speed + UA direction blend.
+    * ``IEXTRP = ±3``: apply FEXTR2 layer factors to surface wind.
+    * ``IEXTRP = +4``: Van Ulden–Holtslag SIMILT below Zi; UA above.
+
+    Negative IEXTRP applies optional layer ``BIAS`` (additive m/s on speed).
+    """
+    from . import similt as _similt
+
+    zmid = layer_mids(zface)
+    nz = len(zmid)
+    z_agl = np.array([lev.height - stn_elev for lev in sounding_levels], dtype=np.float64)
+    wd = np.array([lev.wd for lev in sounding_levels], dtype=np.float64)
+    ws = np.array([lev.ws for lev in sounding_levels], dtype=np.float64)
+    order = np.argsort(z_agl)
+    z_agl, wd, ws = z_agl[order], wd[order], ws[order]
+    mask = z_agl > 0
+    z_agl, wd, ws = z_agl[mask], wd[mask], ws[mask]
+    uu, vv = wind_uv(wd, ws)
+    ws1 = float(np.hypot(u_sfc, v_sfc))
+    u_s = float(u_sfc / max(ws1, 1e-6))
+    v_s = float(v_sfc / max(ws1, 1e-6))
+    U = np.zeros((nz, ny, nx))
+    V = np.zeros_like(U)
+    mode = abs(int(iextrp))
+
+    if mode == 4 and int(iextrp) > 0:
+        # True SIMILT (positive IEXTRP=4 only; -4 keeps golden power-law)
+        us, vs = _similt.similt_profile(
+            u_sfc, v_sfc, z_anem, max(z0, 1e-4), el, zi, zmid, zimin=zimin
+        )
+        for L, zm in enumerate(zmid):
+            if np.isnan(us[L]):
+                u_ua = float(np.interp(zm, z_agl, uu))
+                v_ua = float(np.interp(zm, z_agl, vv))
+                U[L], V[L] = 
