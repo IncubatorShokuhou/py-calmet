@@ -112,7 +112,6 @@ def coare_lite_fluxes(
     rho_a = np.asarray(rho, dtype=np.float64)
     z0 = np.maximum(np.asarray(z0_water, dtype=np.float64), 1e-5)
     ustar = 0.035 * ws
-    # Pre-adjust SST with warm/cool using seed ustar
     t_skin = adjust_sst_skin(
         t_sea, qsw=qsw, ustar=ustar, ws=ws, iwarm=iwarm, icool=icool
     )
@@ -124,13 +123,11 @@ def coare_lite_fluxes(
         if dshelf_km and dshelf_km > 0.0:
             cdn = cdn * (1.0 + 0.15 * np.tanh(10.0 / max(dshelf_km, 0.1)))
         ustar = np.sqrt(cdn) * ws
-        # Charnock + optional wave enhancement
         z0 = 0.011 * ustar**2 / G + 0.11 * 1.5e-5 / np.maximum(ustar, 1e-3)
         if twave is not None and hwave is not None:
             tw = np.asarray(twave, dtype=np.float64)
             hw = np.asarray(hwave, dtype=np.float64)
             ok = (tw > 0.0) & (hw > 0.0) & (tw < 9000.0) & (hw < 9000.0)
-            # Taylor–Yelland-ish: z0 ~ 1200 * H * (H/Lp)^4.5  (lite scale)
             lp = 1.56 * tw**2
             z0_w = 1200.0 * hw * (hw / np.maximum(lp, 1.0)) ** 4.5
             z0 = np.where(ok, np.maximum(z0, np.minimum(z0_w, 0.05)), z0)
@@ -165,7 +162,6 @@ def mixht_overwater(
     zi2 = np.where(el_pos > 0.0, 0.4 * np.sqrt(ustar * el_pos / f), zi)
     zi = np.minimum(zi, zi2)
     if qh is not None and threshw and threshw > 0:
-        # Mild convective boost when upward buoyancy exceeds threshw (W/m²/m * Zi proxy)
         conv = np.asarray(qh, dtype=np.float64) > 0.0
         zi = np.where(conv, np.maximum(zi, constw * ustar / f * (1.0 + 0.1)), zi)
     return np.clip(zi, ziminw, zimaxw)
@@ -254,3 +250,58 @@ def sea_sst_grid(
     tw_out = tw_grid if np.any(tws > 0) else None
     hw_out = hw_grid if np.any(hws > 0) else None
     return t_sea, tw_out, hw_out
+
+
+def resolve_water_temp(
+    *,
+    itwprog: int,
+    landuse,
+    iwat1: int,
+    iwat2: int,
+    tempk,
+    threed=None,
+    hour_index: int = 0,
+    xorig_km: float = 0.0,
+    yorig_km: float = 0.0,
+    dgrid_km: float = 1.0,
+    sea_records: list | None = None,
+    wt_record=None,
+) -> tuple:
+    """Overwater SST with ITWPROG > SEA.DAT > WT.DAT > air-T precedence.
+
+    Returns ``(t_sea, source_note, twave, hwave)``.
+    """
+    import numpy as np
+
+    ny, nx = np.asarray(tempk).shape
+    water = (landuse >= iwat1) & (landuse <= iwat2)
+    twave = hwave = None
+
+    if int(itwprog) != 0 and threed is not None:
+        t_sea = np.asarray(tempk, dtype=np.float64).copy()
+        ti = min(int(hour_index), threed.t2.shape[0] - 1)
+        from . import winds as _winds
+        for j in range(ny):
+            for i in range(nx):
+                if not water[j, i]:
+                    continue
+                xc = xorig_km + (i + 0.5) * dgrid_km
+                yc = yorig_km + (j + 0.5) * dgrid_km
+                ii, jj = _winds._nearest_3d_index(xc, yc, threed, dgrid_km)
+                t_sea[j, i] = float(threed.t2[ti, jj, ii])
+        return t_sea, "ITWPROG", twave, hwave
+
+    if sea_records:
+        t_sea, twave, hwave = sea_sst_grid(
+            sea_records, nx, ny, xorig_km, yorig_km, dgrid_km, tempk
+        )
+        return t_sea, "SEA.DAT", twave, hwave
+
+    if wt_record is not None:
+        from ..io.wt_dat import wt_sst_grid
+        t_sea = wt_sst_grid(
+            wt_record, nx, ny, landuse, iwat1, iwat2, tempk
+        )
+        return t_sea, "WT.DAT", twave, hwave
+
+    return None, "air-T", twave, hwave
