@@ -1,0 +1,224 @@
+nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                        ccfrac[j, i] = float(cc_prog[jj, ii])
+            else:
+                ccfrac = 0.0
+        elif mode == "obs":
+            assert surf is not None and up is not None
+            rec = surf.records[min(h, len(surf.records) - 1)]
+            u1, v1 = winds.obs_surface_uv(rec.ws, rec.wd, nx, ny)
+            sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
+            temp2d = np.full((ny, nx), rec.tempk)
+            rho_tmp = pbl.air_density(temp2d, rec.pres)
+            ust_tmp, el_tmp, _ = pbl.elustr_stable(
+                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky
+            )
+            zi_tmp = pbl.mixht_night(ust_tmp, el_tmp, fcori, constn, zimin, zimax)
+            U, V = winds.obs_profile_similt(
+                u_sfc=float(u1[0, 0]),
+                v_sfc=float(v1[0, 0]),
+                z_anem=10.0,
+                z0=float(z0.mean()),
+                el=float(el_tmp.mean()),
+                zi=float(zi_tmp.mean()),
+                zface=zface,
+                sounding_levels=sounding.levels,
+                stn_elev=float(np.min(elev)),
+                zimin=zimin,
+                nx=nx,
+                ny=ny,
+                iextrp=iextrp,
+                fextr2=fextr2,
+                bias=bias,
+            )
+            sky = rec.sky
+            irh = np.full((ny, nx), rec.rh, dtype=np.int32)
+            ccfrac = clouds.resolve_cloud_fraction(
+                mcloud=mcloud, icloud=icloud, sky_tenths=rec.sky, shape=(ny, nx)
+            )
+        else:  # obs_model
+            assert surf is not None and up is not None and threed is not None
+            ti = min(h, threed.wd.shape[0] - 1)
+            Ug, Vg = winds.interp_3d_to_calmet(
+                threed, zface, nx, ny, geo.xorigkm, geo.yorigkm, geo.dgridkm, hour_index=ti
+            )
+            rec = surf.records[min(h, len(surf.records) - 1)]
+            u1, v1 = winds.obs_surface_uv(rec.ws, rec.wd, nx, ny)
+            sounding = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
+            temp2d = np.full((ny, nx), rec.tempk)
+            rho_tmp = pbl.air_density(temp2d, rec.pres)
+            ust_tmp, el_tmp, _ = pbl.elustr_stable(
+                u1, v1, z0, float(zmid[0]), temp2d, rho_tmp, rec.sky
+            )
+            zi_tmp = pbl.mixht_night(ust_tmp, el_tmp, fcori, constn, zimin, zimax)
+            Uo, Vo = winds.obs_profile_similt(
+                u_sfc=float(u1[0, 0]),
+                v_sfc=float(v1[0, 0]),
+                z_anem=10.0,
+                z0=float(z0.mean()),
+                el=float(el_tmp.mean()),
+                zi=float(zi_tmp.mean()),
+                zface=zface,
+                sounding_levels=sounding.levels,
+                stn_elev=float(np.min(elev)),
+                zimin=zimin,
+                nx=nx,
+                ny=ny,
+                iextrp=iextrp,
+                fextr2=fextr2,
+                bias=bias,
+            )
+            # Multi-station OA when several SS* present; else single-station (golden path)
+            if len(xs_list) > 1:
+                xs_m = np.asarray(xs_list, dtype=np.float64) * 1000.0
+                ys_m = np.asarray(ys_list, dtype=np.float64) * 1000.0
+            else:
+                xs_m = xs_km * 1000.0
+                ys_m = ys_km * 1000.0
+            is_water = (geo.landuse >= iwat1) & (geo.landuse <= iwat2)
+            U, V = winds.objective_analyze(
+                Ug,
+                Vg,
+                Uo,
+                Vo,
+                xs_m=xs_m,
+                ys_m=ys_m,
+                xorig_m=geo.xorigkm * 1000.0,
+                yorig_m=geo.yorigkm * 1000.0,
+                dgrid_m=dgrid_m,
+                r1_m=r1_km * 1000.0,
+                r2_m=r2_km * 1000.0,
+                rprog_m=rprog_km * 1000.0,
+                rmax1_m=(rmax1_km * 1000.0) if rmax1_km > 0 else None,
+                rmax2_m=(rmax2_km * 1000.0) if rmax2_km > 0 else None,
+                rmax3_m=(rmax3_km * 1000.0) if rmax3_km > 0 else None,
+                rmin_m=(rmin_km * 1000.0) if rmin_km > 0 else 0.0,
+                lvary=bool(lvary),
+                icalm=int(icalm),
+                is_water=is_water,
+                nintr2=nintr2 or None,
+                barriers=barrier_set,
+            )
+            sky = rec.sky
+            irh = np.full((ny, nx), rec.rh, dtype=np.int32)
+            method = mcloud if mcloud not in (0, 999) else icloud
+            if method in (3, 4) and threed is not None:
+                cc_prog = clouds.resolve_cloud_fraction(
+                    mcloud=mcloud, icloud=icloud, rh_3d=threed.rh[ti], pres_3d=threed.pres[ti],
+                    shape=(threed.nj, threed.ni),
+                )
+                ccfrac = np.zeros((ny, nx), dtype=np.float64)
+                for j in range(ny):
+                    for i in range(nx):
+                        xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                        yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                        ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                        ccfrac[j, i] = float(cc_prog[jj, ii])
+            else:
+                ccfrac = clouds.resolve_cloud_fraction(
+                    mcloud=mcloud, icloud=icloud, sky_tenths=rec.sky, shape=(ny, nx),
+                )
+
+        # IRHPROG: RH from prognostic 3D when flag set
+        if int(irhprog) != 0 and threed is not None:
+            ti_rh = min(h, threed.rh.shape[0] - 1)
+            irh = np.zeros((ny, nx), dtype=np.int32)
+            for j in range(ny):
+                for i in range(nx):
+                    xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                    yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                    ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                    irh[j, i] = int(threed.rh[ti_rh, jj, ii, 0])
+
+        # DIAG.DAT hourly record for IDIOPT1–5
+        diag_rec = None
+        if diag_data is not None:
+            diag_rec = diag_for_hour(diag_data, ibyr, jday, hour)
+        if diag_rec is not None and diag_rec.has_tsfc():
+            temp2d = diag_opts.apply_diag_sfc_temp(
+                temp2d, idiopt1=idiopt1, tsfc=diag_rec.tsfc
+            )
+
+        # Solar / short-wave (drives daytime PBL + slope qh sign)
+        sinalp = pbl.sine_solar_elevation(lat0, lon0, jday, float(hour), ibtz=ibtz)
+        if np.ndim(sinalp) == 0:
+            sinalp = np.full((ny, nx), float(sinalp))
+        qsw = pbl.shortwave_radiation(sinalp, ccfrac, ha1=ha1, ha2=ha2, hb1=hb1, hb2=hb2)
+        if int(irad) == 0:
+            qsw = np.zeros_like(np.asarray(qsw, dtype=np.float64))
+
+        # surface thermo for flux
+        if mode == "noobs":
+            rho = pbl.air_density(temp2d, 1012.0)
+            pres_mb = 1012.0
+        else:
+            rec_h = surf.records[min(h, len(surf.records) - 1)]
+            rho = pbl.air_density(temp2d, rec_h.pres)
+            pres_mb = rec_h.pres
+
+        # IAVET / TRADKM / NUMTS temperature smoother (no-op when NUMTS<=1)
+        temp2d = run_options.average_temperature(
+            temp2d, iavet=iavet, tradkm=tradkm, dgridkm=geo.dgridkm, numts=numts
+        )
+
+        # Energy-budget qh for slope-flow sign (HEATFX). Full PBL after DIAGNO.
+        qh_eb = pbl.heat_flux_energy_budget(
+            qsw, temp2d, sinalp, ccfrac=ccfrac, landuse=geo.landuse, iwat1=iwat1, iwat2=iwat2, hc1=hc1, hc2=hc2, hc3=hc3
+        )
+        ust_n, el_n, qh_n = pbl.elustr_stable(U[0], V[0], z0, float(zmid[0]), temp2d, rho, sky)
+        day_cell = qh_eb > 0.0
+        qh = np.where(day_cell, qh_eb, qh_n)
+        daytime = bool(np.any(day_cell))
+
+        # IDIOPT4/5: preprocessed surface / upper UV (IRTYPE=0 only)
+        if diag_rec is not None:
+            usfc_d = float(diag_rec.usfc) if diag_rec.has_sfc_uv() else None
+            vsfc_d = float(diag_rec.vsfc) if diag_rec.has_sfc_uv() else None
+            uup_d = float(diag_rec.uup) if diag_rec.has_up_uv() else None
+            vup_d = float(diag_rec.vup) if diag_rec.has_up_uv() else None
+            if U.shape[0] >= 1:
+                u0, v0 = diag_opts.apply_diag_sfc_uv(
+                    U[0], V[0], idiopt4=idiopt4, irtype=irtype,
+                    usfc=usfc_d, vsfc=vsfc_d,
+                )
+                U[0], V[0] = u0, v0
+            U, V = diag_opts.apply_diag_upper_uv(
+                U, V, idiopt5=idiopt5, irtype=irtype, uup=uup_d, vup=vup_d,
+            )
+
+        # --- DIAGNO-ish adjustments (order mirrors CALMET DIAGNO) ---
+        # IWFCOD=0 → skip diagnostic wind module (keep first-guess / OA)
+        if int(iwfcod) == 0:
+            pass
+        elif False:
+            pass
+        # Diagnostic CGAMMA / domain-avg UA wind (IDIOPT2/3, ZUPT, IUPWND, ZUPWND)
+        snd_z_diag = snd_t_diag = None
+        if up is not None and int(idiopt2) == 0:
+            try:
+                sounding_d = _pick_up_sounding(up, ibyr, ibmo, ibdy, hour)
+                stn_elev_d = float(np.min(elev))
+                snd_z_diag = np.array(
+                    [lev.height - stn_elev_d for lev in sounding_d.levels], dtype=np.float64
+                )
+                snd_t_diag = np.array(
+                    [lev.temp_c + 273.15 for lev in sounding_d.levels], dtype=np.float64
+                )
+            except Exception:
+                snd_z_diag = snd_t_diag = None
+        dgamma = None
+        if diag_rec is not None and diag_rec.has_gamma():
+            dgamma = float(diag_rec.gamma)
+        gamma, gnote = diag_opts.resolve_diag_gamma(
+            idiopt2=idiopt2,
+            zupt=zupt,
+            ziconv_mean=float(np.nanmean(ziconv_prev)),
+            sounding_z=snd_z_diag,
+            sounding_t=snd_t_diag,
+            temp_sfc=float(np.nanmean(temp2d)),
+            daytime=daytime,
+            diag_gamma=dgamma,
+        )
+        gamma_diag_last = gamma
+        if h == 0 and gnote:
+            qa_notes.append(gnote)
+        if int(idiopt3) != 0 and diag_rec is not None and diag_rec.has_domain_u
