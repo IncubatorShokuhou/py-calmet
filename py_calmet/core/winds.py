@@ -69,22 +69,4 @@ def obs_surface_uv(ws: float, wd: float, nx: int, ny: int) -> tuple[np.ndarray, 
     return np.full((ny, nx), u, dtype=np.float64), np.full((ny, nx), v, dtype=np.float64)
 
 
-def obs_profile_similt(
-    u_sfc: float,
-    v_sfc: float,
-    z_anem: float,
-    z0: float,
-    el: float,
-    zi: float,
-    zface: np.ndarray,
-    sounding_levels,
-    stn_elev: float,
-    zimin: float,
-    nx: int,
-    ny: int,
-    p_exp: float = 0.17,
-    iextrp: int = -4,
-    fextr2: list[float] | np.ndarray | None = None,
-    bias: list[float] | np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Obs vertical profile controlled by IEXTRP.\n\n    * ``IEXTRP = \u00b11``: surface wind in layer 0 only; aloft from UA sounding.\n    * ``IEXTRP = \u00b12`` or ``-4`` (golden-safe): power-law speed + UA direction blend.\n    * ``IEXTRP = \u00b13``: apply FEXTR2 layer factors to surface wind.\n    * ``IEXTRP = +4``: Van Ulden\u2013Holtslag SIMILT below Zi; UA above.\n\n    Negative IEXTRP applies optional layer ``BIAS`` (additive m/s on speed).\n    """\n    from . import similt as _similt\n\n    zmid = layer_mids(zface)\n    nz = len(zmid)\n    z_agl = np.array([lev.height - stn_elev for lev in sounding_levels], dtype=np.float64)\n    wd = np.array([lev.wd for lev in sounding_levels], dtype=np.float64)\n    ws = np.array([lev.ws for lev in sounding_levels], dtype=np.float64)\n    order = np.argsort(z_agl)\n    z_agl, wd, ws = z_agl[order], wd[order], ws[order]\n    mask = z_agl > 0\n    z_agl, wd, ws = z_agl[mask], wd[mask], ws[mask]\n    uu, vv = wind_uv(wd, ws)\n    ws1 = float(np.hypot(u_sfc, v_sfc))\n    u_s = float(u_sfc / max(ws1, 1e-6))\n    v_s = float(v_sfc / max(ws1, 1e-6))\n    U = np.zeros((nz, ny, nx))\n    V = np.zeros_like(U)\n    mode = abs(int(iextrp))\n\n    if mode == 4 and int(iextrp) > 0:\n        # True SIMILT (positive IEXTRP=4 only; -4 keeps golden power-law)\n        us, vs = _similt.similt_profile(\n            u_sfc, v_sfc, z_anem, max(z0, 1e-4), el, zi, zmid, zimin=zimin\n        )\n        for L, zm in enumerate(zmid):\n            if np.isnan(us[L]):\n                u_ua = float(np.interp(zm, z_agl, uu))\n                v_ua = float(np.interp(zm, z_agl, vv))\n                U[L], V[L] = 
+def obs_profile_sim
