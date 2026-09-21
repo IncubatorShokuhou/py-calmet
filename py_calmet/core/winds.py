@@ -65,7 +65,20 @@ def interp_3d_to_calmet(
 
 
 def obs_surface_uv(ws: float, wd: float, nx: int, ny: int) -> tuple[np.ndarray, np.ndarray]:
-    u, v = wind_uv(wd, ws)
+    """Surface U/V from SURF.DAT ws/wd.
+
+    CALMET missing sentinel ``9999`` (and non-finite) → calm zeros, not a
+    phantom ~10 km/s wind that would poison OA / profiles.
+    """
+    ws_f, wd_f = float(ws), float(wd)
+    if (
+        not (np.isfinite(ws_f) and np.isfinite(wd_f))
+        or ws_f >= 9000.0
+        or wd_f >= 9000.0
+    ):
+        z = np.zeros((ny, nx), dtype=np.float64)
+        return z, z.copy()
+    u, v = wind_uv(wd_f, ws_f)
     return np.full((ny, nx), u, dtype=np.float64), np.full((ny, nx), v, dtype=np.float64)
 
 
@@ -105,15 +118,31 @@ def obs_profile_similt(
     ws = np.array([lev.ws for lev in sounding_levels], dtype=np.float64)
     order = np.argsort(z_agl)
     z_agl, wd, ws = z_agl[order], wd[order], ws[order]
-    mask = z_agl > 0
+    # UP.DAT missing ≈ 999 (same gate as domain_avg_wind_from_sounding)
+    mask = (
+        (z_agl > 0)
+        & np.isfinite(ws)
+        & np.isfinite(wd)
+        & (ws < 998.0)
+        & (wd < 998.0)
+    )
     z_agl, wd, ws = z_agl[mask], wd[mask], ws[mask]
-    uu, vv = wind_uv(wd, ws)
+    have_ua = z_agl.size >= 1
+    if have_ua:
+        uu, vv = wind_uv(wd, ws)
+    else:
+        uu = vv = np.zeros(0, dtype=np.float64)
     ws1 = float(np.hypot(u_sfc, v_sfc))
     u_s = float(u_sfc / max(ws1, 1e-6))
     v_s = float(v_sfc / max(ws1, 1e-6))
     U = np.zeros((nz, ny, nx))
     V = np.zeros_like(U)
     mode = abs(int(iextrp))
+
+    def _ua_at(zm: float) -> tuple[float, float]:
+        if not have_ua:
+            return float(u_sfc), float(v_sfc)
+        return float(np.interp(zm, z_agl, uu)), float(np.interp(zm, z_agl, vv))
 
     if mode == 4 and int(iextrp) > 0:
         # True SIMILT (positive IEXTRP=4 only; -4 keeps golden power-law)
@@ -122,9 +151,7 @@ def obs_profile_similt(
         )
         for L, zm in enumerate(zmid):
             if np.isnan(us[L]):
-                u_ua = float(np.interp(zm, z_agl, uu))
-                v_ua = float(np.interp(zm, z_agl, vv))
-                U[L], V[L] = u_ua, v_ua
+                U[L], V[L] = _ua_at(zm)
             else:
                 U[L], V[L] = float(us[L]), float(vs[L])
     elif mode == 1:
@@ -132,8 +159,7 @@ def obs_profile_similt(
             if L == 0:
                 U[L], V[L] = u_sfc, v_sfc
             else:
-                U[L] = float(np.interp(zm, z_agl, uu))
-                V[L] = float(np.interp(zm, z_agl, vv))
+                U[L], V[L] = _ua_at(zm)
     elif mode == 3:
         fx = list(fextr2) if fextr2 is not None else [1.0] * nz
         fx = fx + [fx[-1]] * max(0, nz - len(fx))
@@ -146,16 +172,18 @@ def obs_profile_similt(
             if L == 0:
                 U[L], V[L] = u_sfc, v_sfc
                 continue
-            spd = ws1 * (zm / z_anem) ** p_exp
-            u_ua = float(np.interp(zm, z_agl, uu))
-            v_ua = float(np.interp(zm, z_agl, vv))
+            spd = ws1 * (zm / max(z_anem, 1e-3)) ** p_exp
+            u_ua, v_ua = _ua_at(zm)
             spd_ua = float(np.hypot(u_ua, v_ua))
-            w = min(1.0, np.log(max(zm, z_anem) / z_anem) / np.log(80.0))
-            spd = (1.0 - 0.4 * w) * spd + 0.4 * w * spd_ua
-            u_a = u_ua / max(spd_ua, 1e-6)
-            v_a = v_ua / max(spd_ua, 1e-6)
-            bu = (1.0 - w) * u_s + w * u_a
-            bv = (1.0 - w) * v_s + w * v_a
+            w = min(1.0, np.log(max(zm, z_anem) / max(z_anem, 1e-3)) / np.log(80.0))
+            if have_ua:
+                spd = (1.0 - 0.4 * w) * spd + 0.4 * w * spd_ua
+                u_a = u_ua / max(spd_ua, 1e-6)
+                v_a = v_ua / max(spd_ua, 1e-6)
+                bu = (1.0 - w) * u_s + w * u_a
+                bv = (1.0 - w) * v_s + w * v_a
+            else:
+                bu, bv = u_s, v_s
             wdir = float(np.rad2deg(np.arctan2(-bu, -bv)) % 360.0)
             u, v = wind_uv(wdir, spd)
             U[L] = u

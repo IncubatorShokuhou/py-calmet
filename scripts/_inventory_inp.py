@@ -647,7 +647,7 @@ MISSING: dict[str, str] = {
     "PS1": "Precip station records unused.",
     "NOWSTA": "Overwater station count unused.",
     "SEADAT": "SEA.DAT unused.",
-    "WTDAT": "WT.DAT unused.",
+    "WTDAT": "Overwater SST soft-spot (io.wt_dat); terrain-weight layout OutOfScope.",
     "IGFMET": "IGF as first-guess unused.",
     "IGFDAT": "IGF-CALMET files unused.",
     "NIGF": "IGF file count unused.",
@@ -1051,7 +1051,7 @@ for _k, _v in WP3_PARTIAL.items():
 WP4_IMPLEMENTED = {
     "METINP": "Control-file path recorded on result.meta / METLST (qa_notes).",
     "MM4DAT": "OutOfScope: non-default MM4/MM5 filenames raise NotImplementedError; use wrfout→3D.DAT.",
-    "WTDAT": "Ignored with qa_note; water T via SEA.DAT / ITWPROG (legacy WT.DAT unused).",
+    "WTDAT": "Overwater SST soft-spot (io.wt_dat); precedence ITWPROG>SEA>WT>air-T. Official terrain-weight WT.DAT OutOfScope.",
     "LCFILES": "Case-insensitive data-file resolve when LCFILES=T.",
     "NUSTA": "Count honored; multi UPDAT list recorded (first readable used).",
     "NM3D": "Count honored; multi M3DDAT list recorded (first readable used).",

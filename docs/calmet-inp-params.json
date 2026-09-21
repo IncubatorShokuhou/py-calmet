@@ -128,7 +128,7 @@
       "in_readcf_or_readfn": true,
       "in_sample_inp": false,
       "status": "Implemented",
-      "notes": "Ignored with qa_note; water T via SEA.DAT / ITWPROG (legacy WT.DAT unused).",
+      "notes": "Overwater SST soft-spot (io.wt_dat); precedence ITWPROG>SEA>WT>air-T. Official terrain-weight WT.DAT OutOfScope.",
       "api_field": "files.wtdat"
     },
     {
