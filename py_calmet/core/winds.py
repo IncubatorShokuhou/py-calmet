@@ -1,1 +1,1 @@
-@/home/box/.cursor/projects/workspace/agent-tools/mcp_push_winds_6500_restore.json
+{"__load__":"/home/box/.cursor/projects/workspace/agent-tools/mcp_push_winds_6500_restore.json"}
