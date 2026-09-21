@@ -2,7 +2,7 @@
 
 Pure-NumPy diagnostic meteorological downscaling inspired by CALMET (CALPUFF system).
 
-## Status — v1 + WP2 + WP3 + WP4 + WP5
+## Status — v1 + WP2 + WP3 + WP4 + WP5 + WP6
 
 **Coverage:** Implemented **207** / Partial **0** / Missing **0** (of 207 INP params).
 
@@ -13,6 +13,8 @@ barriers/lake breeze, non-UTM projections, METLST/PACOUT, IOUTMM5 81–95.
 **WP4** — Partial→Implemented surface clearance; MM4/MM5 OutOfScope.
 **WP5** — IMIXH=±2 Batchvarova–Gryning (`mixht_day_bg`); IDIOPT*/ZUPT/IUPWND
 drive CGAMMA lapse + domain-avg UA wind for Froude/TOPOF2; wrfout via xarray.
+**WP6** — IDIOPT1/4/5=1 DIAG.DAT ingestion; WTDAT water-T with
+ITWPROG>SEA>WT precedence; IRTYPE=0 PBL collapse fix; shared `G=9.81`.
 
 | Case | Grid | Modes | Notes |
 |------|------|-------|-------|
@@ -30,8 +32,7 @@ drive CGAMMA lapse + domain-avg UA wind for Froude/TOPOF2; wrfout via xarray.
 ### OutOfScope / known soft spots
 
 - **MM4DAT / MM5.DAT readers** — OutOfScope by project rule; meteorology input is **wrfout → 3D.DAT** (`scripts/wrfout_to_3d.py`, `py_calmet.io.wrfout` with xarray/wrf-python). Setting a non-default `MM4DAT` raises `NotImplementedError`.
-- **IDIOPT1/4/5 = 1** — preprocessed diagnostic-file winds/T are not ingested; QA notes only (defaults `=0` compute internally).
-- **WTDAT** — ignored; use SEA.DAT / ITWPROG for overwater temperature.
+- **Official WT.DAT terrain-weight layout** (CALMET User's Guide §8.10) — not implemented; this package's `WTDAT` soft-spot path is **overwater SST** (see `io.wt_dat`).
 
 ### Optional extras
 
