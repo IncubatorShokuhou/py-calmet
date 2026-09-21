@@ -112,4 +112,16 @@ def obs_profile_similt(
     u_s = float(u_sfc / max(ws1, 1e-6))
     v_s = float(v_sfc / max(ws1, 1e-6))
     U = np.zeros((nz, ny, nx))
- 
+    V = np.zeros_like(U)
+    mode = abs(int(iextrp))
+
+    if mode == 4 and int(iextrp) > 0:
+        # True SIMILT (positive IEXTRP=4 only; -4 keeps golden power-law)
+        us, vs = _similt.similt_profile(
+            u_sfc, v_sfc, z_anem, max(z0, 1e-4), el, zi, zmid, zimin=zimin
+        )
+        for L, zm in enumerate(zmid):
+            if np.isnan(us[L]):
+                u_ua = float(np.interp(zm, z_agl, uu))
+                v_ua = float(np.interp(zm, z_agl, vv))
+                U[L], V[L] = 
