@@ -32,4 +32,26 @@ def interp_3d_to_calmet(
     dgrid_km: float,
     hour_index: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Map 3D.DAT winds onto CALMET 
+    """Map 3D.DAT winds onto CALMET layers (RDMM5-style log below first level).
+
+    Horizontal mapping uses geographic cell centers vs 3D.DAT origin/spacing
+    (the common 1-cell MM5 halo is a special case of this, not a hardcoded +1).
+    """
+    zmid = layer_mids(zface)
+    nz = len(zmid)
+    U = np.zeros((nz, ny, nx), dtype=np.float64)
+    V = np.zeros_like(U)
+    t = hour_index
+    for j in range(ny):
+        for i in range(nx):
+            xc = xorig_km + (i + 0.5) * dgrid_km
+            yc = yorig_km + (j + 0.5) * dgrid_km
+            ii, jj = _nearest_3d_index(xc, yc, threed, dgrid_km)
+            elev = float(threed.elev[jj, ii])
+            zs = threed.height_msl[t, jj, ii, :] - elev
+            zs = np.maximum.accumulate(np.maximum(zs, 1.0))
+            us, vs = wind_uv(threed.wd[t, jj, ii, :], threed.ws[t, jj, ii, :])
+            for L, zm in enumerate(zmid):
+                if zm < zs[0]:
+                    ratio = (np.log(zm) - np.log(ZO_EXTRAP)) / (
+                        np.log(zs[0]) - np.log(ZO_EXTRA
