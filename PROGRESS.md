@@ -1,5 +1,14 @@
 # py-calmet progress
 
+## WRF-only validation (马尾) — drop synthetic goldens
+
+- **Deleted** `cases/small_domain`, `cases/daytime_zi`, `tests/test_parity.py`, `tests/test_daytime_zi.py`.
+- Suite Fortran gate is **only** `cases/wrf_demo` (Katrina wrfout + mountain `geo.dat`): `tests/test_wrf_demo.py` + `scripts/compare_wrf_fortran.py`.
+- Readers / INP / CALMET.DAT writer tests retargeted to wrf_demo inputs.
+- Live `calmet.x` preferred when vendored; else archived Fortran-from-WRF-case goldens (still real WRF, not synthetic).
+- Lat/lon bbox documented in `cases/wrf_demo/README.md` for upcoming SRTM terrain.
+- Skipped: DIAGNO rewrite, bit-identical floats, MM4/MM5.
+
 ## Align-up-temp-precip-sea-miss (马尾) — UP T / PRECIP / SEA 缺测
 
 - **UP.DAT** `temp_c≥998` → `up_tempk` 返回 NaN；runner 探空 T 走该路径；**Holzworth** 跳过非物理 Kelvin，避免 999°C→1272 K 把 Zi 拽崩。

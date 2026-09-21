@@ -10,9 +10,9 @@ from py_calmet.io.inp import read_inp, write_inp
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE_INPS = [
-    ROOT / "cases" / "small_domain" / "goldens" / "obs" / "calmet.inp",
     ROOT / "cases" / "wrf_demo" / "goldens" / "obs" / "calmet.inp",
-    ROOT / "cases" / "daytime_zi" / "goldens" / "noobs" / "calmet.inp",
+    ROOT / "cases" / "wrf_demo" / "goldens" / "obs_model" / "calmet.inp",
+    ROOT / "cases" / "wrf_demo" / "goldens" / "noobs" / "calmet.inp",
 ]
 
 
@@ -29,7 +29,7 @@ def test_config_has_all_207_params():
     assert cfg.effective_iwat() == (55, 55)
 
 
-@pytest.mark.parametrize("path", CASE_INPS, ids=["small_obs", "wrf_obs", "daytime_noobs"])
+@pytest.mark.parametrize("path", CASE_INPS, ids=["wrf_obs", "wrf_obs_model", "wrf_noobs"])
 def test_full_inp_parse_no_key_loss(path: Path):
     assert path.is_file()
     inp = read_inp(path)
@@ -48,7 +48,7 @@ def test_full_inp_parse_no_key_loss(path: Path):
     assert inp.config.ha1 == 990.0
 
 
-@pytest.mark.parametrize("path", CASE_INPS, ids=["small_obs", "wrf_obs", "daytime_noobs"])
+@pytest.mark.parametrize("path", CASE_INPS, ids=["wrf_obs", "wrf_obs_model", "wrf_noobs"])
 def test_inp_roundtrip_preserves_keys(path: Path, tmp_path: Path):
     original = read_inp(path)
     out = tmp_path / "roundtrip.inp"

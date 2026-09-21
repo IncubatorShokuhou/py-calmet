@@ -1437,7 +1437,7 @@ def main() -> None:
     rm.append("")
     rm.append("- Replace `light_terrain_adjust` with Fortran-aligned `TOPOF2`-style kinematic `W` from terrain slope × wind.")
     rm.append("- Feed horizontal adjustment consistently with `ALPHA`.")
-    rm.append("- Golden: enable `IKINE=1` on `small_domain` / synthetic slope case.")
+    rm.append("- Golden: enable `IKINE=1` on `wrf_demo` terrain/slope case.")
     rm.append("")
     rm.append("### 3. IOBR — full O'Brien adjustment")
     rm.append("")

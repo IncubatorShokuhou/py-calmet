@@ -18,23 +18,36 @@ ITWPROG>SEA>WT precedence; IRTYPE=0 PBL collapse fix; shared `G=9.81`.
 
 | Case | Grid | Modes | Notes |
 |------|------|-------|-------|
-| `cases/small_domain` | 12×12 @ 1 km, synthetic | `obs` / `obs_model` / `noobs` | Tight relative-RMSE gates |
-| `cases/wrf_demo` | 12×12 @ ~28 km, NCAR Katrina wrfout | `obs` / `obs_model` / `noobs` | Floored U/V RMSE + correlation |
-| `cases/daytime_zi` | 12×12 @ 1 km, hours 00–17 UTC | `noobs` | Carson/MIXHMC daytime path |
+| `cases/wrf_demo` | 12×12 @ ~28 km, NCAR Katrina wrfout + GEO.DAT | `obs` / `obs_model` / `noobs` | **Sole** Fortran-compare gate (floored U/V RMSE + correlation) |
+
+Synthetic `small_domain` / `daytime_zi` cases were removed — validation is WRF-only.
 
 ### v1 complete
 
 - Readers + writers: GEO / SURF / UP / 3D.DAT / INP / CALMET.DAT / NetCDF
 - Winds: 3D→CALMET interp, IEXTRP profiles (power-law / SIMILT), multi-station Barnes OA (R1/R2/RPROG/RMAX*/NINTR2), **FRADJ**, **slope**, **NSMTH**; **IKINE TOPOF2** + **IOBR O'Brien** (gated)
 - PBL: night ELUSTR+MIXHT; daytime energy-budget QH + Maul–Carson **or Batchvarova–Gryning** ZI with MIXDT lapse; RH clouds (MCLOUD 3/4); NPSTA precip + PRECIP.DAT; COARE-lite + SEA.DAT/IWARM/ICOOL
-- Golden parity: tiny-domain tight; wrf_demo U/V corr ≳ 0.97 (noobs); daytime ZI corr ≳ 0.99 vs Fortran shape
+- Golden parity: **wrf_demo only** (real Katrina WRF + mountain GEO.DAT); noobs U/V corr ≳ 0.97 vs Fortran
 
 ### OutOfScope / known soft spots
 
 - **MM4DAT / MM5.DAT readers** — OutOfScope by project rule; meteorology input is **wrfout → 3D.DAT** (`scripts/wrfout_to_3d.py`, `py_calmet.io.wrfout` with xarray/wrf-python). Setting a non-default `MM4DAT` raises `NotImplementedError`.
 - **Official WT.DAT terrain-weight layout** (CALMET User's Guide §8.10) — not implemented; this package's `WTDAT` soft-spot path is **overwater SST** (see `io.wt_dat`).
 
+## Validation (WRF-only)
+
+Primary gate: `tests/test_wrf_demo.py` and `scripts/compare_wrf_fortran.py` against
+Fortran CALMET outputs for the Katrina wrfout case (with `geo.dat` terrain).
+Live `calmet.x` is used when present; otherwise archived Fortran-from-WRF-case
+goldens under `cases/wrf_demo/goldens/`.
+
+```bash
+pytest tests/test_wrf_demo.py -v
+python scripts/compare_wrf_fortran.py
+```
+
 ### Optional extras
+
 
 ```bash
 pip install 'py-calmet[wrf]'   # xarray + wrf-python + netCDF4

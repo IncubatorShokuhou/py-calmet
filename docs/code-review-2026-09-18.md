@@ -1,3 +1,5 @@
+> **Note (2026-09):** synthetic `small_domain` / `daytime_zi` cases were removed; Fortran validation is **wrf_demo-only**.
+
 # Code review — py-calmet (main @ 722b850)
 
 **Date:** 2026-09-18

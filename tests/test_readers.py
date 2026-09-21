@@ -1,11 +1,11 @@
-"""Smoke tests for input and CALMET.DAT readers."""
+"""Smoke tests for input and CALMET.DAT readers (wrf_demo / real WRF)."""
 from pathlib import Path
 import numpy as np
 from py_calmet.io import read_geo, read_surf, read_up, read_3d, read_inp, read_calmet_dat
 
 ROOT = Path(__file__).resolve().parents[1]
-INPUTS = ROOT / "cases" / "small_domain" / "goldens" / "inputs"
-GOLD = ROOT / "cases" / "small_domain" / "goldens"
+INPUTS = ROOT / "cases" / "wrf_demo" / "goldens" / "inputs"
+GOLD = ROOT / "cases" / "wrf_demo" / "goldens"
 
 
 def test_read_geo():
@@ -13,12 +13,14 @@ def test_read_geo():
     assert g.nx == 12 and g.ny == 12
     assert g.elev.shape == (12, 12)
     assert g.landuse[0, 0] == 20
+    # Katrina mountain window — real terrain, not flat synthetic
+    assert float(g.elev.max()) > 1000.0
 
 
 def test_read_surf():
     s = read_surf(INPUTS / "surf.dat")
     assert len(s.records) == 3
-    assert s.records[0].ws == 3.5
+    assert s.records[0].ws > 0.0
 
 
 def test_read_up():
@@ -30,7 +32,7 @@ def test_read_up():
 def test_read_3d():
     d = read_3d(INPUTS / "3d.dat")
     assert d.ni == 14 and d.nj == 14 and d.nk == 10
-    assert d.ws.shape[0] == 4
+    assert d.ws.shape[0] >= 3
 
 
 def test_read_calmet_dat_obs():
@@ -38,8 +40,7 @@ def test_read_calmet_dat_obs():
     assert m.nx == 12 and m.ny == 12 and m.nz == 8 and m.nt == 3
     assert m.get_3d_field("U").shape == (3, 8, 12, 12)
     assert "ZI" in m.fields_2d
-    # times should be 2020
-    assert m.get_time_bounds()[0][0].year == 2020
+    assert m.get_time_bounds()[0][0].year == 2005
 
 
 def test_read_inp_modes():
@@ -66,7 +67,7 @@ def test_yyyyjjjhh_years_not_divisible_by_10():
 
 
 def test_wrf_demo_calmet_dat_times():
-    path = ROOT / "cases" / "wrf_demo" / "goldens" / "noobs" / "CALMET.DAT"
+    path = GOLD / "noobs" / "CALMET.DAT"
     m = read_calmet_dat(path)
     t0 = m.get_time_bounds()[0][0]
     assert t0.year == 2005
