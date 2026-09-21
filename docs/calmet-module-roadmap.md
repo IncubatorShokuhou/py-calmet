@@ -49,7 +49,7 @@ Ordered plan to close gaps versus Fortran CALMET after v1 (INP coverage: 207 imp
 
 - Replace `light_terrain_adjust` with Fortran-aligned `TOPOF2`-style kinematic `W` from terrain slope × wind.
 - Feed horizontal adjustment consistently with `ALPHA`.
-- Golden: enable `IKINE=1` on `small_domain` / synthetic slope case.
+- Golden: enable `IKINE=1` on `wrf_demo` slope/terrain case.
 
 ### 3. IOBR — full O'Brien adjustment
 

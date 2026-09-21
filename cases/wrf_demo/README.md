@@ -41,3 +41,20 @@ cd cases/wrf_demo/noobs && ./calmet.x calmet.inp
 ```
 
 Raw wrfout is gitignored (`cases/wrf_demo/raw/`); goldens + shared text inputs are committed.
+
+## Lat/lon bounding box (for SRTM / higher-res terrain)
+
+Authoritative corners from NCAR Katrina `wrfout` mass-point `XLAT`/`XLONG` on the
+committed window (`i0=4, j0=0`, `ni=nj=14`), cross-checked against `3d.dat` header
+line `1 1 14 14 … -99.9285 -96.4206 19.1075 22.3873`.
+
+| Domain | South | North | West | East |
+|--------|------:|------:|-----:|-----:|
+| 3D.DAT / MM5 14×14 (cell centers) | 19.107475 | 22.387329 | -99.928474 | -96.420570 |
+| GEO.DAT / CALMET 12×12 interior (cell centers) | 19.362259 | 22.137604 | -99.658630 | -96.690407 |
+| SRTM recommend (12×12 ±½ cell) | 19.236107 | 22.263756 | -99.793549 | -96.555489 |
+| SRTM recommend (14×14 ±½ cell) | 18.981327 | 22.513477 | -100.063393 | -96.285652 |
+
+Grid spacing ≈ 0.25° / ~28 km. UTM zone **14N** in `geo.dat`. Terrain elev in GEO
+matches wrfout `HGT` (max ≈ 2884 m).
+

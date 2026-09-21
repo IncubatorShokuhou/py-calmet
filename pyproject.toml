@@ -24,3 +24,6 @@ include = ["py_calmet*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+  "wrf_primary: real-WRF wrf_demo Fortran compare (sole suite gate)",
+]

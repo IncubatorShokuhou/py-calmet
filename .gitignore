@@ -21,7 +21,3 @@ cases/wrf_demo/work/
 cases/wrf_demo/obs/
 cases/wrf_demo/obs_model/
 cases/wrf_demo/noobs/
-cases/daytime_zi/work/
-cases/small_domain/obs/
-cases/small_domain/obs_model/
-cases/small_domain/noobs/

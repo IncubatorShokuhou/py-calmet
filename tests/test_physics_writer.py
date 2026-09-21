@@ -15,7 +15,7 @@ from py_calmet.io.calmet_dat import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-TINY = ROOT / "cases" / "small_domain" / "goldens"
+TINY = ROOT / "cases" / "wrf_demo" / "goldens"  # real WRF case
 
 
 def test_slope_flow_nonzero_on_slope():
