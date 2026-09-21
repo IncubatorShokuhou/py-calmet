@@ -1,0 +1,8 @@
+            ccgrid=cc,
+                ))
+            write_cloud(cld_out, CloudData(nx=nx, ny=ny, records=recs), iformc=iformc)
+            result.meta["clddat_out"] = str(cld_out)
+
+    result.meta["metdat"] = str(metdat_name)
+    result.meta["lsave"] = bool(lsave)
+    return result
