@@ -1,0 +1,233 @@
+try:
+            cloud_data = read_cloud(cld_path, nx, ny)
+        except Exception:
+            cloud_data = None
+
+    # Optional WT.DAT (water T; soft-spot path — see io.wt_dat docstring)
+    wt_name = inp.get("WTDAT")
+    wt_path = _resolve_data_file(inputs_dir, case_dir, wt_name, "wt.dat", lcfiles=lcfiles)
+    if wt_path is not None:
+        try:
+            wt_data = read_wt(wt_path, nx=nx, ny=ny)
+            qa_notes.append(f"WTDAT loaded {wt_path} nrec={len(wt_data.records)}")
+        except Exception as exc:
+            qa_notes.append(f"WTDAT read failed ({exc}); ignoring")
+
+    # Optional DIAG.DAT (IDIOPT1–5=1 preprocessed fields)
+    dia_name = inp.get("DIADAT")
+    dia_path = _resolve_data_file(inputs_dir, case_dir, dia_name, "diag.dat", lcfiles=lcfiles)
+    if dia_path is not None:
+        try:
+            diag_data = read_diag(dia_path)
+            qa_notes.extend(diag_data.notes)
+            qa_notes.append(f"DIADAT loaded {dia_path} nrec={len(diag_data.records)}")
+        except Exception as exc:
+            qa_notes.append(f"DIADAT read failed ({exc}); ignoring")
+
+    barrier_set = barriers_mod.BarrierSet.from_inp(inp)
+    lake_cfg = barriers_mod.LakeBreezeConfig.from_inp(inp)
+
+    xs_list, ys_list = _parse_surface_stations(inp, geo, nx, ny)
+    xs_km, ys_km = xs_list[0], ys_list[0]
+    isurft = inp.get_int("ISURFT", 0)
+    iupt = inp.get_int("IUPT", 0)
+    # ISURFT 1-based station index for representative surface T / OA anchor
+    if isurft > 0 and isurft <= len(xs_list):
+        xs_km, ys_km = xs_list[isurft - 1], ys_list[isurft - 1]
+
+    lat0, lon0 = _estimate_latlon(inp, geo, nx, ny)
+    fcori = run_options.effective_fcoriol(inp, float(lat0))
+    ibtz = run_options.ibtz_hours(inp)
+    if not inp.get("ABTZ") and inp.get_int("IBTZ", 0) == 0:
+        pass
+    elif inp.get("ABTZ"):
+        ibtz = _ibtz_from_abtz(inp.get("ABTZ", "UTC+0000") or "UTC+0000")
+    qa_notes.extend(run_options.qa_isteppgs(inp, nsecdt))
+
+    constn = inp.get_float("CONSTN", 2400.0)
+    zimin = inp.get_float("ZIMIN", 50.0)
+    zimax = inp.get_float("ZIMAX", 3000.0)
+    r1_km = inp.get_float("R1", 1.0)
+    r2_km = inp.get_float("R2", r1_km)
+    rprog_km = inp.get_float("RPROG", 0.0)
+    rmax1_km = inp.get_float("RMAX1", 0.0)
+    rmax2_km = inp.get_float("RMAX2", rmax1_km)
+    rmax3_km = inp.get_float("RMAX3", 0.0)
+    rmin_km = inp.get_float("RMIN", 0.1)
+    lvary = inp.get_bool("LVARY", False)
+    icalm = inp.get_int("ICALM", 0)
+    iwfcod = inp.get_int("IWFCOD", 1)
+    irad = inp.get_int("IRAD", 1)
+    irhprog = inp.get_int("IRHPROG", 0)
+    iavezi = inp.get_int("IAVEZI", 1)
+    mnmdav = inp.get_int("MNMDAV", 1)
+    hafang = inp.get_float("HAFANG", 30.0)
+    ilevzi = inp.get_int("ILEVZI", 1)
+    izicrlx = inp.get_int("IZICRLX", 1)
+    tzicrlx = inp.get_float("TZICRLX", 800.0)
+    imixh = inp.get_int("IMIXH", 1)
+    itwprog = inp.get_int("ITWPROG", 0)
+    iluoc3d = inp.get_int("ILUOC3D", 16)
+    iavet = inp.get_int("IAVET", 1)
+    tradkm = inp.get_float("TRADKM", 500.0)
+    numts = inp.get_int("NUMTS", 5)
+    nflagp = inp.get_int("NFLAGP", 2)
+    iforms = inp.get_int("IFORMS", 2)
+    igfmet = inp.get_int("IGFMET", 0)
+    lprint = inp.get_bool("LPRINT", False)
+    irtype = inp.get_int("IRTYPE", 1)
+    itest = inp.get_int("ITEST", 2)
+    mreg = inp.get_int("MREG", 0)
+    lcalgrd = inp.get_bool("LCALGRD", True)
+    idiopt1 = inp.get_int("IDIOPT1", 0)
+    idiopt2 = inp.get_int("IDIOPT2", 0)
+    idiopt3 = inp.get_int("IDIOPT3", 0)
+    idiopt4 = inp.get_int("IDIOPT4", 0)
+    idiopt5 = inp.get_int("IDIOPT5", 0)
+    zupt = inp.get_float("ZUPT", 200.0)
+    iupwnd = inp.get_int("IUPWND", -1)
+    zupwnd = inp.get_list_float("ZUPWND") or [1.0, 1000.0]
+    qa_notes.extend(
+        diag_opts.qa_idiopt(
+            [idiopt1, idiopt2, idiopt3, idiopt4, idiopt5],
+            irtype=irtype,
+            diag_loaded=diag_data is not None and bool(diag_data.records),
+        )
+    )
+    um_domain = 0.0
+    vm_domain = 0.0
+    gamma_diag_last = None
+    alpha = inp.get_float("ALPHA", 0.1)
+    niter = inp.get_int("NITER", 50)
+    threshl = inp.get_float("THRESHL", 0.05)
+    dptmin = inp.get_float("DPTMIN", 0.001)
+    constb = inp.get_float("CONSTB", 1.41)
+    dgrid_m = geo.dgridkm * 1000.0
+    terrad = inp.get_float("TERRAD", 5.0)
+    critfn = inp.get_float("CRITFN", 1.0)
+    ifradj = inp.get_int("IFRADJ", 1)
+    ikine = inp.get_int("IKINE", 0)
+    iobr = inp.get_int("IOBR", 0)
+    islope = inp.get_int("ISLOPE", 1)
+    nsmth = inp.get_list_int("NSMTH") or ([2] + [4] * (nz - 1))
+    nintr2 = inp.get_list_int("NINTR2") or []
+    iextrp = inp.get_int("IEXTRP", -4)
+    fextr2 = inp.get_list_float("FEXTR2") or []
+    bias = inp.get_list_float("BIAS") or []
+    divlim = inp.get_float("DIVLIM", 5e-6)
+    mcloud = inp.get_int("MCLOUD", 0)
+    icloud = inp.get_int("ICLOUD", 0)
+    npsta = inp.get_int("NPSTA", 0)
+    sigmap = inp.get_float("SIGMAP", 100.0)
+    cutp = inp.get_float("CUTP", 0.01)
+    icoare = inp.get_int("ICOARE", 0)
+    dshelf = inp.get_float("DSHELF", 0.0)
+    constw = inp.get_float("CONSTW", 0.16)
+    ziminw = inp.get_float("ZIMINW", 50.0)
+    zimaxw = inp.get_float("ZIMAXW", 3000.0)
+    iwarm = inp.get_int("IWARM", 0)
+    icool = inp.get_int("ICOOL", 0)
+    threshw = inp.get_float("THRESHW", 0.05)
+    itprog = inp.get_int("ITPROG", 0)
+    dzzi = inp.get_float("DZZI", 200.0)
+    conste = inp.get_float("CONSTE", 0.15)
+    iformo = inp.get_int("IFORMO", 1)
+    lsave = inp.get_bool("LSAVE", True)
+    icldout = inp.get_int("ICLDOUT", 0)
+    iformc = inp.get_int("IFORMC", 2)
+    ps_xs, ps_ys = _parse_precip_stations(inp)
+    # JWAT1/JWAT2 are the INP names; IWAT1/IWAT2 are GEO/header aliases.
+    if cfg is not None and hasattr(cfg, "effective_iwat"):
+        iwat1, iwat2 = cfg.effective_iwat()
+    else:
+        j1 = inp.get_int("JWAT1", inp.get_int("IWAT1", 999))
+        j2 = inp.get_int("JWAT2", inp.get_int("IWAT2", 999))
+        iwat1, iwat2 = (55, 55) if (j1 == 999 and j2 == 999) else (j1, j2)
+
+    ha1 = inp.get_float("HA1", 990.0)
+    ha2 = inp.get_float("HA2", -30.0)
+    hb1 = inp.get_float("HB1", -0.75)
+    hb2 = inp.get_float("HB2", 3.4)
+    hc1 = inp.get_float("HC1", 5.31e-13)
+    hc2 = inp.get_float("HC2", 60.0)
+    hc3 = inp.get_float("HC3", 0.12)
+    metdat_name = (inp.get("METDAT") or "CALMET.DAT")
+
+    U_all, V_all = [], []
+    zi_prev = np.zeros((ny, nx), dtype=np.float64)
+    # IGF-CALMET first guess when IGFMET≠0
+    igf_data = None
+    if int(igfmet) != 0:
+        igf_name = inp.get("IGFDAT") or "igf.dat"
+        igf_path = _resolve_data_file(inputs_dir, case_dir, igf_name, "igf.dat", lcfiles=lcfiles)
+        if igf_path is not None:
+            igf_data = igf_mod.read_igf(igf_path)
+            qa_notes.append(f"IGFMET loaded {igf_path} ok={igf_data.header.ok}")
+        else:
+            qa_notes.append(f"IGFMET={igfmet} but IGFDAT not found")
+    # ITEST=1 → setup-only (return empty result after QA)
+    if int(itest) == 1:
+        qa_notes.append("ITEST=1 setup-only stop")
+        result = CalmetResult(
+            mode=mode, zface=zface,
+            U=np.zeros((0, nz, ny, nx)), V=np.zeros((0, nz, ny, nx)),
+            W=np.zeros((0, nz, ny, nx)), T=np.zeros((0, nz, ny, nx)),
+            IPGT=np.zeros((0, ny, nx), dtype=np.int32),
+            USTAR=np.zeros((0, ny, nx)), ZI=np.zeros((0, ny, nx)),
+            EL=np.zeros((0, ny, nx)), WSTAR=np.zeros((0, ny, nx)),
+            TEMPK=np.zeros((0, ny, nx)), RHO=np.zeros((0, ny, nx)),
+            QSW=np.zeros((0, ny, nx)), IRH=np.zeros((0, ny, nx), dtype=np.int32),
+            elev=elev, z0=z0,
+            meta={"qa_notes": qa_notes, "itest": 1, "nx": nx, "ny": ny, "nz": nz},
+        )
+        return result
+    us1_xy = run_options.parse_us1_coords(inp)
+    if us1_xy is not None:
+        qa_notes.append(f"US1 coords km={us1_xy}")
+    IPGT_all, USTAR_all, ZI_all, EL_all, WSTAR_all = [], [], [], [], []
+    TEMPK_all, RHO_all, QSW_all, IRH_all, T_all, W_all = [], [], [], [], [], []
+    RMM_all = []
+    ziconv_prev = np.zeros((ny, nx), dtype=np.float64)
+    dptt_prev = np.zeros((ny, nx), dtype=np.float64)
+
+    for h in range(nhrs):
+        step_t = start + timedelta(seconds=h * nsecdt)
+        hour = step_t.hour
+        jday = int(step_t.strftime("%j"))
+        ibyr, ibmo, ibdy = step_t.year, step_t.month, step_t.day
+        # --- first-guess / obs winds ---
+        if mode == "noobs":
+            assert threed is not None
+            ti = min(h, threed.wd.shape[0] - 1)
+            U, V = winds.interp_3d_to_calmet(
+                threed, zface, nx, ny, geo.xorigkm, geo.yorigkm, geo.dgridkm, hour_index=ti
+            )
+            temp2d = np.zeros((ny, nx))
+            irh = np.full((ny, nx), 70, dtype=np.int32)
+            for j in range(ny):
+                for i in range(nx):
+                    xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                    yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                    ii, jj = winds._nearest_3d_index(xc, yc, threed, geo.dgridkm)
+                    temp2d[j, i] = threed.t2[ti, jj, ii]
+                    irh[j, i] = int(threed.rh[ti, jj, ii, 0])
+            sky = 0.0
+            # RH-based clouds when MCLOUD/ICLOUD 3/4 — compute on 3D grid then map
+            rh_col = threed.rh[ti]  # (nj,ni,nk)
+            pr_col = threed.pres[ti]
+            cc_prog = clouds.resolve_cloud_fraction(
+                mcloud=mcloud,
+                icloud=icloud,
+                sky_tenths=0.0,
+                rh_3d=rh_col,
+                pres_3d=pr_col,
+                shape=(threed.nj, threed.ni),
+            )
+            method = mcloud if mcloud not in (0, 999) else icloud
+            if method in (3, 4) and np.ndim(cc_prog) == 2:
+                ccfrac = np.zeros((ny, nx), dtype=np.float64)
+                for j in range(ny):
+                    for i in range(nx):
+                        xc = geo.xorigkm + (i + 0.5) * geo.dgridkm
+                        yc = geo.yorigkm + (j + 0.5) * geo.dgridkm
+                        ii, jj = winds._

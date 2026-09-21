@@ -1,0 +1,250 @@
+v_stn[s] = v_obs_a[:, jj, ii]
+    elif u_obs_a.ndim == 2 and u_obs_a.shape[0] == nstn:
+        u_stn, v_stn = u_obs_a, v_obs_a
+    elif u_obs_a.ndim == 2 and u_obs_a.shape[1] == nstn:
+        u_stn, v_stn = u_obs_a.T, v_obs_a.T
+    else:
+        raise ValueError(
+            f"u_obs shape {u_obs_a.shape} incompatible with nstn={nstn}, nz={nz}"
+        )
+
+    for j in range(ny):
+        for i in range(nx):
+            xc = xorig_m + (i + 0.5) * dgrid_m
+            yc = yorig_m + (j + 0.5) * dgrid_m
+            dist2 = (xc - xs) ** 2 + (yc - ys) ** 2
+            for k in range(nz):
+                rk = r1_m if k == 0 else r2_m
+                rmax = rmax1_m if k == 0 else rmax2_m
+                # RMAX3: over-water cells use alternate cutoff when provided
+                if (
+                    is_water is not None
+                    and rmax3_m is not None
+                    and rmax3_m > 0
+                    and bool(is_water[j, i])
+                ):
+                    rmax = rmax3_m
+                dist = np.sqrt(dist2)
+                # RMIN: floor distance to avoid singularity at station
+                dist_w = np.maximum(dist, float(rmin_m) if rmin_m and rmin_m > 0 else 0.0)
+                w_stn = np.exp(-(dist_w ** 2) / max(rk, 1.0) ** 2)
+                if rmax is not None and rmax > 0:
+                    w_stn = np.where(dist <= rmax, w_stn, 0.0)
+                    # LVARY: expand radius until at least one station weighs in
+                    if lvary and not np.any(w_stn > 0) and dist.size:
+                        order = np.argsort(dist)
+                        keep = order[: max(1, min(3, dist.size))]
+                        w_stn = np.zeros_like(w_stn)
+                        w_stn[keep] = np.exp(-(dist_w[keep] ** 2) / max(rk, 1.0) ** 2)
+                if barriers is not None:
+                    from .barriers import station_clear_mask
+                    x0k = (xorig_m / 1000.0) if xorig_km is None else xorig_km
+                    y0k = (yorig_m / 1000.0) if yorig_km is None else yorig_km
+                    clear = station_clear_mask(
+                        xc / 1000.0, yc / 1000.0,
+                        xs / 1000.0, ys / 1000.0,
+                        barriers, layer_k=k,
+                    )
+                    w_stn = np.where(clear, w_stn, 0.0)
+                if nintr2 is not None:
+                    nmax = int(nintr2[k]) if k < len(nintr2) else int(nintr2[-1])
+                    if nmax > 0 and nmax < w_stn.size:
+                        # Keep only the nmax nearest stations
+                        order = np.argsort(dist2)
+                        mask = np.zeros_like(w_stn, dtype=bool)
+                        mask[order[:nmax]] = True
+                        w_stn = np.where(mask, w_stn, 0.0)
+                num_u = float(np.dot(w_stn, u_stn[:, k]))
+                num_v = float(np.dot(w_stn, v_stn[:, k]))
+                den = float(w_stn.sum())
+                if rprog_m and rprog_m > 0.0:
+                    wp = (rk / max(rprog_m, 1.0)) ** 2
+                    num_u += wp * ug[k, j, i]
+                    num_v += wp * vg[k, j, i]
+                    den += wp
+                if den > 1e-12:
+                    u_oa = num_u / den
+                    v_oa = num_v / den
+                    if int(icalm) != 0:
+                        # ICALM≠0: discard calm obs contributions (ws < 0.5 m/s)
+                        spd_oa = (u_oa ** 2 + v_oa ** 2) ** 0.5
+                        if spd_oa < 0.5:
+                            continue  # keep IGF
+                    U[k, j, i] = u_oa
+                    V[k, j, i] = v_oa
+                # else leave IGF
+    return U, V
+
+
+def topographic_kinematic_w(
+    U: np.ndarray,
+    V: np.ndarray,
+    elev: np.ndarray,
+    zface: np.ndarray,
+    tempk: np.ndarray,
+    dgrid_m: float,
+    alpha: float = 0.1,
+    gamma: float | np.ndarray = 0.01,
+) -> np.ndarray:
+    """TOPOF2-style terrain-induced vertical velocity (IKINE=1).
+
+    Computes stability-dependent exponential decay of slope-forced W
+    (Yocke 1979 / CALMET TOPOF2), returned at layer midpoints ``(nz,ny,nx)``.
+    Does **not** modify U,V — pair with ``divergence_minimize`` / O'Brien.
+    """
+    nz, ny, nx = U.shape
+    if np.isscalar(gamma):
+        gam2d = np.full((ny, nx), float(gamma), dtype=np.float64)
+    else:
+        gam2d = np.asarray(gamma, dtype=np.float64)
+    tau = -0.01
+    hinv = 500.0
+    W_face = np.zeros((nz + 1, ny, nx), dtype=np.float64)
+    dzi = 0.5 / dgrid_m
+    for j in range(ny):
+        for i in range(nx):
+            temp = float(max(tempk[j, i], 200.0))
+            gamma2 = float(gam2d[j, i]) - tau
+            if gamma2 < 0.0:
+                s = -1.0
+            else:
+                s = float(np.sqrt(G * gamma2 / temp))
+            xws = float(np.hypot(U[nz - 1, j, i], V[nz - 1, j, i]))
+            xws = max(xws, 1e-6)
+            bk = 2.0 / hinv if s <= 0.0 else s / xws
+            im1 = elev[j, i - 1] if i > 0 else elev[j, i]
+            ip1 = elev[j, i + 1] if i < nx - 1 else elev[j, i]
+            jm1 = elev[j - 1, i] if j > 0 else elev[j, i]
+            jp1 = elev[j + 1, i] if j < ny - 1 else elev[j, i]
+            delhi = (ip1 - im1) * dzi
+            delhj = (jp1 - jm1) * dzi
+            wtopo = float(U[0, j, i] * delhi + V[0, j, i] * delhj)
+            w1 = np.zeros(nz + 1, dtype=np.float64)
+            w1[0] = wtopo
+            w_tf = np.zeros(nz + 1, dtype=np.float64)
+            w_tf[0] = wtopo
+            for k in range(nz):
+                bkz = min(bk * float(zface[k + 1]), 50.0)
+                w1[k + 1] = wtopo * np.exp(-bkz)
+                dz = float(zface[k + 1] - zface[k])
+                dwdz1 = (w1[k + 1] - w1[k]) / max(dz, 1e-6)
+                dwdz = alpha * dwdz1
+                w_tf[k + 1] = dwdz * dz + w_tf[k]
+            # Terrain-following transform
+            w_tf[0] = w_tf[0] - U[0, j, i] * delhi - V[0, j, i] * delhj
+            for k in range(nz):
+                w_tf[k + 1] = w_tf[k + 1] - U[k, j, i] * delhi - V[k, j, i] * delhj
+            W_face[:, j, i] = w_tf
+    W = np.zeros((nz, ny, nx), dtype=np.float64)
+    for k in range(nz):
+        W[k] = 0.5 * (W_face[k] + W_face[k + 1])
+    return W
+
+
+def light_terrain_adjust(
+    U: np.ndarray,
+    V: np.ndarray,
+    elev: np.ndarray,
+    dgrid_m: float,
+    alpha: float = 0.1,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Legacy near-surface tilt (pre-TOPOF2). Prefer topographic_kinematic_w."""
+    Uo, Vo = U.copy(), V.copy()
+    dzdx = np.gradient(elev, dgrid_m, axis=1)
+    dzdy = np.gradient(elev, dgrid_m, axis=0)
+    for k in range(min(2, U.shape[0])):
+        scale = alpha * (1.0 - k / 3.0)
+        speed = np.hypot(Uo[k], Vo[k])
+        Uo[k] = Uo[k] - scale * dzdx * speed
+        Vo[k] = Vo[k] - scale * dzdy * speed
+    return Uo, Vo
+
+
+def terrain_radius_stats(
+    elev: np.ndarray,
+    dgrid_m: float,
+    terrad_km: float = 5.0,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """TERSET-like HMAX/HMIN and birdwise distances within TERRAD (km)."""
+    ny, nx = elev.shape
+    dx_km = dgrid_m * 0.001
+    irange = max(int(round(terrad_km / max(dx_km, 1e-6))), 0)
+    hmax = elev.copy()
+    hmin = elev.copy()
+    disthmax = np.zeros((ny, nx), dtype=np.float64)
+    disthmin = np.zeros((ny, nx), dtype=np.float64)
+    for j in range(ny):
+        l1 = max(0, j - irange)
+        l2 = min(ny, j + irange + 1)
+        for i in range(nx):
+            k1 = max(0, i - irange)
+            k2 = min(nx, i + irange + 1)
+            for jj in range(l1, l2):
+                for ii in range(k1, k2):
+                    dist_km = np.hypot((ii - i) * dx_km, (jj - j) * dx_km)
+                    if dist_km > terrad_km:
+                        continue
+                    if elev[jj, ii] > hmax[j, i]:
+                        hmax[j, i] = elev[jj, ii]
+                        disthmax[j, i] = dist_km * 1000.0
+                    if elev[jj, ii] < hmin[j, i]:
+                        hmin[j, i] = elev[jj, ii]
+                        disthmin[j, i] = dist_km * 1000.0
+    return hmax, hmin, disthmax, disthmin
+
+
+def _drainage_uv(delhi: float, delhj: float, uvally: float) -> tuple[float, float]:
+    """Resolve Mahrt slope-flow speed into U,V (Fortran SLOPE angle convention)."""
+    if delhi == 0.0 and delhj == 0.0:
+        return 0.0, 0.0
+    if delhi == 0.0:
+        thet = 270.0 if delhj < 0.0 else 90.0
+    else:
+        thetp = np.degrees(np.arctan(delhj / delhi))
+        if delhi < 0.0:
+            thet = thetp + 180.0
+        elif delhj > 0.0:
+            thet = thetp
+        else:
+            thet = thetp + 360.0
+    if 0.0 <= thet <= 90.0:
+        thetd = 90.0 - thet
+    else:
+        thetd = 450.0 - thet
+    ang = np.radians(270.0 - thetd)
+    return float(-np.cos(ang) * uvally), float(-np.sin(ang) * uvally)
+
+
+def slope_flow(
+    elev: np.ndarray,
+    dgrid_m: float,
+    qh: np.ndarray,
+    tempk: np.ndarray,
+    rho: np.ndarray,
+    zface: np.ndarray,
+    landuse: np.ndarray | None = None,
+    terrad_km: float = 5.0,
+    iwat1: int = 55,
+    iwat2: int = 55,
+    cdk: float = 0.08,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Mahrt / Horst–Doran slope flow aligned with CALMET SLOPE (cdk=0.08)."""
+    ny, nx = elev.shape
+    nz = len(zface) - 1
+    hmax, hmin, disthmax, disthmin = terrain_radius_stats(elev, dgrid_m, terrad_km)
+    rhocp = 1229.9
+    Uadd = np.zeros((nz, ny, nx), dtype=np.float64)
+    Vadd = np.zeros_like(Uadd)
+
+    for j in range(ny):
+        for i in range(nx):
+            if landuse is not None and iwat1 <= int(landuse[j, i]) <= iwat2:
+                continue
+            im1 = elev[j, i - 1] if i > 0 else elev[j, i]
+            ip1 = elev[j, i + 1] if i < nx - 1 else elev[j, i]
+            jm1 = elev[j - 1, i] if j > 0 else elev[j, i]
+            jp1 = elev[j + 1, i] if j < ny - 1 else elev[j, i]
+            delhi = (ip1 - im1) * (0.5 / dgrid_m)
+            delhj = (jp1 - jm1) * (0.5 / dgrid_m)
+            aalpha = np.arctan(np.hypot(delhi, delhj))
+         
